@@ -124,8 +124,8 @@ Frontend:
 - Vite
 - React Router
 
-The system is not fully deployable yet because this is an early design-stage submission.
-## below are the Planned Setup and Deployment, these are intended future steps, not currently runnable instructions
+## Below are the planned setup and deployment, these are intended future steps, not currently runnable instructions. The system is not fully deployable yet because this is an early design-stage submission.
+
 
 Install root dependencies:
 ```bash
