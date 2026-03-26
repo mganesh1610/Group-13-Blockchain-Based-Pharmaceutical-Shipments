@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+.next/
+artifacts/
+cache/
+coverage/
+.env
+.env.*
+!.env.example
