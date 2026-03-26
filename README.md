@@ -85,7 +85,7 @@ function addVerification(
 The main file to check this contract draft is:
 - `contracts/SupplyChainProvenance.sol`
 
-This file inlcudes:
+This file includes:
 - Draft Contract Code
 - Signatures/interfaces of contract components
 - High-level comments explaining functionality of the component
@@ -98,7 +98,7 @@ Verification idea:
 2. hash it again
 3. compare the new hash with the on-chain hash
 
-## Current Folder Structure
+## Current Folder Structure, not yet fully implemented:
 ```text
 contracts/
   SupplyChainProvenance.sol
@@ -124,7 +124,9 @@ Frontend:
 - Vite
 - React Router
 
-## Basic Setup
+The system is not fully deployable yet because this is an early design-stage submission.
+## below are the Planned Setup and Deployment, these are intended future steps, not currently runnable instructions
+
 Install root dependencies:
 ```bash
 npm install
@@ -140,17 +142,6 @@ Install frontend dependencies:
 ```bash
 cd ../frontend
 npm install
-```
-
-## Basic Usage
-Run tests:
-```bash
-npm test
-```
-
-Start local Hardhat node:
-```bash
-npx hardhat node
 ```
 
 Deploy contract locally:
