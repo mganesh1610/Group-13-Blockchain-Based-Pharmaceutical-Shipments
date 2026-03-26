@@ -1,4 +1,6 @@
+pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
 /**
  * This file shows the planned contract structure for the project. The main
  business logic is left as TODO placeholders because this is an early draft.
