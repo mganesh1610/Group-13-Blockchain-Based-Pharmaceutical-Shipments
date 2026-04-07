@@ -1,0 +1,17 @@
+require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
+
+const { AMOY_RPC_URL, PRIVATE_KEY } = process.env;
+const networks = {};
+
+if (AMOY_RPC_URL) {
+  networks.amoy = {
+    url: AMOY_RPC_URL,
+    accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+  };
+}
+
+module.exports = {
+  solidity: "0.8.20",
+  networks
+};

@@ -98,73 +98,102 @@ Verification idea:
 2. hash it again
 3. compare the new hash with the on-chain hash
 
-## Current Folder Structure, not yet fully implemented:
+## Current Folder Structure
 ```text
 contracts/
   SupplyChainProvenance.sol
+scripts/
+  deploy.js
+  seedRoles.js
+  demoFlow.js
+test/
+  SupplyChainProvenance.test.js
 backend/
+  src/
+    uploads/
 frontend/
+  index.html
+  package.json
+  vite.config.js
+docs/
+  demo-flow.md
+  interim-demo-guide.md
+package.json
+hardhat.config.js
 ```
 
 ## Dependencies
-Root:
+Root blockchain demo:
 - Node.js
 - Hardhat
 - OpenZeppelin Contracts
-- Ethers v6
+- Ethers v6 (through Hardhat toolbox)
+- dotenv
 
-Backend:
+Backend (planned next stage):
 - Express
 - Multer
 - CORS
 - dotenv
 
-Frontend:
+Frontend (planned next stage):
 - React
 - Vite
 - React Router
 
-## Below are the planned setup and deployment, these are intended future steps, not currently runnable instructions. The system is not fully deployable yet because this is an early design-stage submission.
+## Current Working Demo
+This repository now includes a minimal runnable blockchain demo for the interim presentation.
 
+The current implemented flow is:
+1. Admin deploys the contract and grants stakeholder roles.
+2. Manufacturer registers a batch.
+3. Manufacturer transfers custody to the distributor.
+4. Distributor updates shipment status and anchors a condition log hash.
+5. Retailer receives the batch and marks it delivered.
+6. Regulator adds a verification record.
+7. The final batch summary is read back from the contract.
 
-Install root dependencies:
+## Current Demo Commands
+Install dependencies:
 ```bash
 npm install
 ```
 
-Install backend dependencies:
+Run automated contract tests:
 ```bash
-cd backend
-npm install
+npm test
 ```
 
-Install frontend dependencies:
+Run the interim demo flow:
 ```bash
-cd ../frontend
-npm install
+npm run demo:flow
 ```
 
-Deploy contract locally:
+Optional browser demo:
 ```bash
+npm run node
 npm run deploy:local
-```
-
-Start backend:
-```bash
-cd backend
-npm run dev
-```
-
-Start frontend:
-```bash
 cd frontend
+npm install
 npm run dev
 ```
+
+The browser demo provides a small visual workflow for the same stakeholder sequence using a local Hardhat node and the deployed contract address saved into `frontend/public/demo-contract.json`.
+
+## Planned Next Stage
+These parts are still planned and not yet fully implemented:
+- Express backend for IoT file upload and hashing
+- Simulated IoT log generation routes
+- Frontend pages for batch registration and consumer verification
+- Wallet-based blockchain interaction from the UI
 
 ## Notes for This Submission
-This repo is still an early draft. The contract file currently focuses on structure and interfaces more than full business logic. The backend and frontend folders are added mainly to show the planned project structure and interfaces for the next implementation stage.
+This repo is an interim milestone submission. The smart contract, local demo script, and automated tests now support a small working stakeholder flow for presentation. The backend and frontend folders remain part of the planned next implementation stage.
 
 
 ## Files to Check
 - `contracts/SupplyChainProvenance.sol`
-- `github-repository-link.txt`
+- `scripts/demoFlow.js`
+- `test/SupplyChainProvenance.test.js`
+- `docs/demo-flow.md`
+- `Group-13-github-repository-link.txt`
