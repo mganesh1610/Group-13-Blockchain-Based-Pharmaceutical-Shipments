@@ -5,10 +5,23 @@ import "./styles.css";
 
 const defaultBatchId = "BATCHUI001";
 const defaultRpcUrl = "http://127.0.0.1:8545";
+const accountLabels = {
+  0: "Admin",
+  1: "Manufacturer",
+  2: "Distributor",
+  3: "Retailer",
+  4: "Regulator"
+};
 
 function shortAddress(value) {
   if (!value) return "-";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function findAccountLabel(address, accounts) {
+  const matchIndex = accounts.findIndex((account) => account.toLowerCase() === address.toLowerCase());
+  if (matchIndex === -1) return shortAddress(address);
+  return accountLabels[matchIndex] || `Account ${matchIndex}`;
 }
 
 function formatTimestamp(value) {
@@ -66,10 +79,10 @@ export default function App() {
     }
   }
 
-  function getContractWithSigner(index = 0) {
+  async function getContractWithSigner(index = 0) {
     if (!provider) throw new Error("Connect to the local RPC first.");
     if (!contractAddress) throw new Error("Enter or deploy a contract address first.");
-    const signer = provider.getSigner(index);
+    const signer = await provider.getSigner(index);
     return new Contract(contractAddress, supplyChainAbi, signer);
   }
 
@@ -78,7 +91,7 @@ export default function App() {
     setErrorMessage("");
 
     try {
-      const contract = getContractWithSigner(0);
+      const contract = await getContractWithSigner(0);
       const manufacturerRole = await contract.MANUFACTURER_ROLE();
       const distributorRole = await contract.DISTRIBUTOR_ROLE();
       const retailerRole = await contract.RETAILER_ROLE();
@@ -89,7 +102,7 @@ export default function App() {
       await (await contract.grantRole(retailerRole, accounts[3])).wait();
       await (await contract.grantRole(regulatorRole, accounts[4])).wait();
 
-      pushLog("Granted manufacturer, distributor, retailer, and regulator roles.");
+      pushLog("Admin granted the stakeholder roles to the local demo accounts.");
     } catch (error) {
       setErrorMessage(error.shortMessage || error.message);
     } finally {
@@ -102,12 +115,12 @@ export default function App() {
     setErrorMessage("");
 
     try {
-      const contract = getContractWithSigner(1);
+      const contract = await getContractWithSigner(1);
       await (
         await contract.registerBatch(batchId, "Course Demo Vaccine Batch", "Phoenix, AZ", 1711929600)
       ).wait();
       pushLog(`Manufacturer registered ${batchId}.`);
-      await refreshBatchDetails();
+      await refreshBatchDetails({ logReload: false });
     } catch (error) {
       setErrorMessage(error.shortMessage || error.message);
     } finally {
@@ -120,8 +133,8 @@ export default function App() {
     setErrorMessage("");
 
     try {
-      const manufacturerContract = getContractWithSigner(1);
-      const distributorContract = getContractWithSigner(2);
+      const manufacturerContract = await getContractWithSigner(1);
+      const distributorContract = await getContractWithSigner(2);
       const distributorAddress = accounts[2];
 
       await (
@@ -136,12 +149,12 @@ export default function App() {
           keccak256(toUtf8Bytes(`${batchId}-normal-ui-log`)),
           `backend/uploads/${batchId}-normal.json`,
           false,
-          "12 readings, max temp 6.7C, no breach detected"
+          "12 readings, max temp 6.7C, all readings stayed in the safe range"
         )
       ).wait();
 
       pushLog("Distributor received custody, marked shipment, and anchored condition log.");
-      await refreshBatchDetails();
+      await refreshBatchDetails({ logReload: false });
     } catch (error) {
       setErrorMessage(error.shortMessage || error.message);
     } finally {
@@ -154,9 +167,9 @@ export default function App() {
     setErrorMessage("");
 
     try {
-      const distributorContract = getContractWithSigner(2);
-      const retailerContract = getContractWithSigner(3);
-      const regulatorContract = getContractWithSigner(4);
+      const distributorContract = await getContractWithSigner(2);
+      const retailerContract = await getContractWithSigner(3);
+      const regulatorContract = await getContractWithSigner(4);
 
       await (
         await distributorContract.transferCustody(batchId, accounts[3], "Tempe, AZ", "Delivered to retailer")
@@ -174,7 +187,7 @@ export default function App() {
       ).wait();
 
       pushLog("Retailer completed delivery and regulator added verification.");
-      await refreshBatchDetails();
+      await refreshBatchDetails({ logReload: false });
     } catch (error) {
       setErrorMessage(error.shortMessage || error.message);
     } finally {
@@ -182,12 +195,13 @@ export default function App() {
     }
   }
 
-  async function refreshBatchDetails() {
+  async function refreshBatchDetails(options = {}) {
+    const { logReload = true } = options;
     setIsBusy(true);
     setErrorMessage("");
 
     try {
-      const contract = getContractWithSigner(0);
+      const contract = await getContractWithSigner(0);
       const [nextBatch, nextCustody, nextConditions, nextVerification] = await Promise.all([
         contract.getBatch(batchId),
         contract.getCustodyHistory(batchId),
@@ -199,7 +213,9 @@ export default function App() {
       setCustodyHistory(nextCustody);
       setConditionHistory(nextConditions);
       setVerificationHistory(nextVerification);
-      pushLog(`Loaded current details for ${batchId}.`);
+      if (logReload) {
+        pushLog(`Loaded current details for ${batchId}.`);
+      }
     } catch (error) {
       setErrorMessage(error.shortMessage || error.message);
       setBatch(null);
@@ -246,10 +262,14 @@ export default function App() {
           </button>
           <div className="account-list">
             <strong>Detected Accounts</strong>
+            <p className="helper-copy">
+              These are local Hardhat test accounts. Account 0 acts as admin, then Accounts 1 to 4 are used as
+              manufacturer, distributor, retailer, and regulator for the demo.
+            </p>
             {accounts.length === 0 ? <p>No accounts loaded yet.</p> : null}
             {accounts.map((account, index) => (
               <div key={account} className="account-row">
-                <span>Account {index}</span>
+                <span>{accountLabels[index] ? `Account ${index} (${accountLabels[index]})` : `Account ${index}`}</span>
                 <code>{shortAddress(account)}</code>
               </div>
             ))}
@@ -258,10 +278,6 @@ export default function App() {
 
         <section className="card">
           <h2>2. Stakeholder Flow</h2>
-          <p className="support-copy">
-            Run the buttons from top to bottom during the recording. This gives you a simple visual demo of the
-            same workflow covered by the terminal script.
-          </p>
           <div className="button-stack">
             <button onClick={grantRoles} disabled={isBusy || accounts.length < 5}>
               Grant Demo Roles
@@ -331,7 +347,7 @@ export default function App() {
               {custodyHistory.length === 0 ? <p>No custody history yet.</p> : null}
               {custodyHistory.map((entry, index) => (
                 <div key={`${entry.timestamp}-${index}`} className="timeline-item">
-                  <strong>{shortAddress(entry.from)} to {shortAddress(entry.to)}</strong>
+                  <strong>{findAccountLabel(entry.from, accounts)} to {findAccountLabel(entry.to, accounts)}</strong>
                   <p>{entry.location}</p>
                   <p>{entry.notes}</p>
                   <p>{formatTimestamp(entry.timestamp)}</p>
@@ -346,6 +362,7 @@ export default function App() {
                   <strong>{entry.breachFlag ? "Breach" : "Normal Log"}</strong>
                   <p>{entry.summary}</p>
                   <p>{entry.logURI}</p>
+                  <p>Submitted by: {findAccountLabel(entry.submittedBy, accounts)}</p>
                   <p>{formatTimestamp(entry.timestamp)}</p>
                 </div>
               ))}
@@ -358,6 +375,7 @@ export default function App() {
                   <strong>{entry.verificationType}</strong>
                   <p>{entry.result ? "Passed" : "Failed"}</p>
                   <p>{entry.remarks}</p>
+                  <p>Verified by: {findAccountLabel(entry.verifiedBy, accounts)}</p>
                   <p>{formatTimestamp(entry.timestamp)}</p>
                 </div>
               ))}

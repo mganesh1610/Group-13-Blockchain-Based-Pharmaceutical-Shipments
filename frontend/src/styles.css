@@ -132,6 +132,12 @@ code {
   line-height: 1.5;
 }
 
+.helper-copy {
+  color: #5c7380;
+  line-height: 1.5;
+  margin: 0.6rem 0 0.9rem;
+}
+
 .error-box {
   margin-top: 1rem;
   border-radius: 12px;

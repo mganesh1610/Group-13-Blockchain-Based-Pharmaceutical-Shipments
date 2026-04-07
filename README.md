@@ -153,32 +153,76 @@ The current implemented flow is:
 6. Regulator adds a verification record.
 7. The final batch summary is read back from the contract.
 
-## Current Demo Commands
-Install dependencies:
+For the local browser demo, the stakeholder accounts are simulated using the default Hardhat test accounts:
+- Account 0 = Admin
+- Account 1 = Manufacturer
+- Account 2 = Distributor
+- Account 3 = Retailer
+- Account 4 = Regulator
+
+These are local development accounts created by Hardhat for testing. They are not MetaMask accounts and they are only used for the local demo flow.
+
+## Main Browser Demo
+For the recording, the browser demo is the recommended primary demo because it shows the stakeholder flow visually.
+
+Install the root dependencies first:
 ```bash
 npm install
 ```
+
+Then run the demo using separate terminals.
+
+Terminal 1: start the local Hardhat node
+```bash
+npm run node
+```
+
+Terminal 2: deploy the contract locally
+```bash
+npm run deploy:local
+```
+
+Terminal 3: start the frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open the local Vite URL shown in Terminal 3.
+
+The browser demo uses:
+- a local Hardhat RPC node at `http://127.0.0.1:8545`
+- a locally deployed contract address saved into `frontend/public/demo-contract.json`
+- the default Hardhat test accounts as demo stakeholder accounts
+
+In the browser UI:
+- `Connect to Local Node` loads the available local Hardhat accounts
+- `Grant Demo Roles` assigns the stakeholder roles to the local demo accounts
+- the remaining buttons run the batch lifecycle flow using those accounts
+
+Notes:
+- The contract address may change if you restart the local node and deploy again
+- The local RPC URL usually stays the same if you use the default Hardhat node
+- If you restart the node, run `npm run deploy:local` again before using the browser UI
+- If you want the browser demo to start from a clean state, do not run `npm run demo:flow` before opening the UI
+
+## Terminal Verification and Backup Demo
+The terminal demo is still useful as a backup for the recording and as proof that the contract workflow is working.
 
 Run automated contract tests:
 ```bash
 npm test
 ```
 
-Run the interim demo flow:
+Run the end-to-end terminal demo flow:
 ```bash
 npm run demo:flow
 ```
 
-Optional browser demo:
-```bash
-npm run node
-npm run deploy:local
-cd frontend
-npm install
-npm run dev
-```
-
-The browser demo provides a small visual workflow for the same stakeholder sequence using a local Hardhat node and the deployed contract address saved into `frontend/public/demo-contract.json`.
+What these terminal commands show:
+- `npm test` verifies the contract logic with automated tests
+- `npm run demo:flow` runs the same stakeholder lifecycle in script form and prints the final batch summary
 
 ## Planned Next Stage
 These parts are still planned and not yet fully implemented:
