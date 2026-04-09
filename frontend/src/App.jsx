@@ -282,7 +282,7 @@ export default function App() {
       </header>
 
       <main className="operations-board">
-        <section className="board-top">
+        <section className="board-top grid">
           <section className="panel panel-operations card">
             <h2>1. Operations</h2>
             <label>
@@ -392,7 +392,7 @@ export default function App() {
           </section>
         </section>
 
-        <section className="panel panel-provenance card">
+        <section className="panel panel-provenance card" style={{ marginTop: "1rem" }}>
           <h2>3. Provenance Timeline</h2>
           <div className="timeline-columns">
             <div>
