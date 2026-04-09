@@ -167,6 +167,33 @@ code {
   border: 1px solid rgba(21, 128, 140, 0.08);
 }
 
+.stakeholder-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.stakeholder-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.85rem 0.95rem;
+}
+
+.stakeholder-copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.stakeholder-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .account-row {
   display: flex;
   justify-content: space-between;
@@ -175,10 +202,29 @@ code {
   align-items: center;
 }
 
-.account-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.extra-accounts {
+  margin-top: 0.95rem;
+  opacity: 0.9;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(236, 244, 246, 0.75);
+  border: 1px dashed rgba(21, 128, 140, 0.18);
+}
+
+.extra-accounts summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.extra-accounts-body {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.extra-accounts .account-row {
+  margin-top: 0;
 }
 
 .inline-button {
@@ -268,11 +314,23 @@ code {
   color: var(--muted);
 }
 
+.account-row code,
+.stakeholder-row code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
 @media (max-width: 900px) {
   .board-top,
   .timeline-columns,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .stakeholder-row,
+  .account-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .hero h1 {

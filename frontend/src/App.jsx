@@ -54,6 +54,8 @@ export default function App() {
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [visibleAddresses, setVisibleAddresses] = useState({});
+  const primaryAccounts = accounts.slice(0, 5);
+  const extraAccounts = accounts.slice(5);
 
   useEffect(() => {
     loadSavedContractAddress().then((address) => {
@@ -311,21 +313,51 @@ export default function App() {
                 manufacturer, distributor, retailer, and regulator for the demo.
               </p>
               {accounts.length === 0 ? <p>No accounts loaded yet.</p> : null}
-              {accounts.map((account, index) => (
-                <div key={account} className="account-row">
-                  <span>{accountLabels[index] ? `Account ${index} (${accountLabels[index]})` : `Account ${index}`}</span>
-                  <div className="account-actions">
-                    <code>{shortAddress(account)}</code>
-                    <button
-                      type="button"
-                      className="secondary-button inline-button"
-                      onClick={() => copyAddress(account, accountLabels[index] || `Account ${index}`)}
-                    >
-                      Copy
-                    </button>
-                  </div>
+              {primaryAccounts.length > 0 ? (
+                <div className="stakeholder-group">
+                  {primaryAccounts.map((account, index) => (
+                    <div key={account} className="stakeholder-row">
+                      <div className="stakeholder-copy">
+                        <span className="stakeholder-label">{accountLabels[index] || `Account ${index}`}</span>
+                        <code>{shortAddress(account)}</code>
+                      </div>
+                      <button
+                        type="button"
+                        className="secondary-button inline-button"
+                        onClick={() => copyAddress(account, accountLabels[index] || `Account ${index}`)}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : null}
+              {extraAccounts.length > 0 ? (
+                <details className="extra-accounts">
+                  <summary>Show extra local test accounts</summary>
+                  <div className="extra-accounts-body">
+                    {extraAccounts.map((account, offset) => {
+                      const index = offset + 5;
+
+                      return (
+                        <div key={account} className="account-row">
+                          <div className="stakeholder-copy">
+                            <span className="stakeholder-label">Account {index}</span>
+                            <code>{shortAddress(account)}</code>
+                          </div>
+                          <button
+                            type="button"
+                            className="secondary-button inline-button"
+                            onClick={() => copyAddress(account, `Account ${index}`)}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
             </div>
             <div className="button-stack">
               <button onClick={grantRoles} disabled={isBusy || accounts.length < 5}>
