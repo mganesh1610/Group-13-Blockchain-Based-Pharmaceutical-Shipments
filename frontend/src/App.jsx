@@ -318,7 +318,10 @@ export default function App() {
                   {primaryAccounts.map((account, index) => (
                     <div key={account} className="stakeholder-row">
                       <div className="stakeholder-copy">
-                        <span className="stakeholder-label">{accountLabels[index] || `Account ${index}`}</span>
+                        <span className="stakeholder-label">
+                          <span className="account-index-pill">Account {index}</span>
+                          <span>{accountLabels[index] || `Account ${index}`}</span>
+                        </span>
                         <code>{shortAddress(account)}</code>
                       </div>
                       <button
@@ -342,7 +345,9 @@ export default function App() {
                       return (
                         <div key={account} className="account-row">
                           <div className="stakeholder-copy">
-                            <span className="stakeholder-label">Account {index}</span>
+                            <span className="stakeholder-label">
+                              <span className="account-index-pill">Account {index}</span>
+                            </span>
                             <code>{shortAddress(account)}</code>
                           </div>
                           <button
@@ -427,61 +432,82 @@ export default function App() {
         <section className="panel panel-provenance">
           <h2>3. Provenance Timeline</h2>
           <div className="timeline-columns">
-            <div>
-              <h3>Custody</h3>
-              {custodyHistory.length === 0 ? <p>No custody history yet.</p> : null}
-              {custodyHistory.map((entry, index) => (
-                <div key={`${entry.timestamp}-${index}`} className="timeline-item">
-                  <strong>{findAccountLabel(entry.from, accounts)} to {findAccountLabel(entry.to, accounts)}</strong>
-                  <p className="actor-copy">
-                    {shortAddress(entry.from)} to {shortAddress(entry.to)}
-                  </p>
-                  <p>{entry.location}</p>
-                  <p>{entry.notes}</p>
-                  {renderAddressToggle(`custody-${entry.timestamp}-${index}`, [
-                    { label: "From", value: entry.from },
-                    { label: "To", value: entry.to }
-                  ])}
-                  <p>{formatTimestamp(entry.timestamp)}</p>
-                </div>
-              ))}
-            </div>
-            <div>
-              <h3>Conditions</h3>
-              {conditionHistory.length === 0 ? <p>No condition records yet.</p> : null}
-              {conditionHistory.map((entry, index) => (
-                <div key={`${entry.timestamp}-${index}`} className="timeline-item">
-                  <strong>{entry.breachFlag ? "Breach" : "Normal Log"}</strong>
-                  <p>{entry.summary}</p>
-                  <p>{entry.logURI}</p>
-                  <p className="actor-copy">
-                    Submitted by: {findAccountLabel(entry.submittedBy, accounts)} ({shortAddress(entry.submittedBy)})
-                  </p>
-                  {renderAddressToggle(`condition-${entry.timestamp}-${index}`, [
-                    { label: "Submitted by", value: entry.submittedBy }
-                  ])}
-                  <p>{formatTimestamp(entry.timestamp)}</p>
-                </div>
-              ))}
-            </div>
-            <div>
-              <h3>Verification</h3>
-              {verificationHistory.length === 0 ? <p>No regulator verification yet.</p> : null}
-              {verificationHistory.map((entry, index) => (
-                <div key={`${entry.timestamp}-${index}`} className="timeline-item">
-                  <strong>{entry.verificationType}</strong>
-                  <p>{entry.result ? "Passed" : "Failed"}</p>
-                  <p>{entry.remarks}</p>
-                  <p className="actor-copy">
-                    Verified by: {findAccountLabel(entry.verifiedBy, accounts)} ({shortAddress(entry.verifiedBy)})
-                  </p>
-                  {renderAddressToggle(`verification-${entry.timestamp}-${index}`, [
-                    { label: "Verified by", value: entry.verifiedBy }
-                  ])}
-                  <p>{formatTimestamp(entry.timestamp)}</p>
-                </div>
-              ))}
-            </div>
+            <section className="timeline-lane">
+              <div className="timeline-lane-header">
+                <h3>Custody</h3>
+                <p>Transfer history across custodians.</p>
+              </div>
+              {custodyHistory.length === 0 ? <p className="timeline-empty">No custody history yet.</p> : null}
+              <ol className="timeline-track">
+                {custodyHistory.map((entry, index) => (
+                  <li key={`${entry.timestamp}-${index}`} className="timeline-item">
+                    <div className="timeline-item-header">
+                      <strong>{findAccountLabel(entry.from, accounts)} to {findAccountLabel(entry.to, accounts)}</strong>
+                      <span>{formatTimestamp(entry.timestamp)}</span>
+                    </div>
+                    <p className="timeline-detail">
+                      {shortAddress(entry.from)} to {shortAddress(entry.to)}
+                    </p>
+                    <p className="timeline-detail">{entry.location}</p>
+                    <p className="timeline-detail">{entry.notes}</p>
+                    {renderAddressToggle(`custody-${entry.timestamp}-${index}`, [
+                      { label: "From", value: entry.from },
+                      { label: "To", value: entry.to }
+                    ])}
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section className="timeline-lane">
+              <div className="timeline-lane-header">
+                <h3>Conditions</h3>
+                <p>Temperature and sensor logs submitted along the route.</p>
+              </div>
+              {conditionHistory.length === 0 ? <p className="timeline-empty">No condition records yet.</p> : null}
+              <ol className="timeline-track">
+                {conditionHistory.map((entry, index) => (
+                  <li key={`${entry.timestamp}-${index}`} className="timeline-item">
+                    <div className="timeline-item-header">
+                      <strong>{entry.breachFlag ? "Breach" : "Normal Log"}</strong>
+                      <span>{formatTimestamp(entry.timestamp)}</span>
+                    </div>
+                    <p className="timeline-detail">{entry.summary}</p>
+                    <p className="timeline-detail">{entry.logURI}</p>
+                    <p className="actor-copy timeline-detail">
+                      Submitted by: {findAccountLabel(entry.submittedBy, accounts)} ({shortAddress(entry.submittedBy)})
+                    </p>
+                    {renderAddressToggle(`condition-${entry.timestamp}-${index}`, [
+                      { label: "Submitted by", value: entry.submittedBy }
+                    ])}
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section className="timeline-lane">
+              <div className="timeline-lane-header">
+                <h3>Verification</h3>
+                <p>Regulator checks that confirm shipment status.</p>
+              </div>
+              {verificationHistory.length === 0 ? <p className="timeline-empty">No regulator verification yet.</p> : null}
+              <ol className="timeline-track">
+                {verificationHistory.map((entry, index) => (
+                  <li key={`${entry.timestamp}-${index}`} className="timeline-item">
+                    <div className="timeline-item-header">
+                      <strong>{entry.verificationType}</strong>
+                      <span>{formatTimestamp(entry.timestamp)}</span>
+                    </div>
+                    <p className="timeline-detail">{entry.result ? "Passed" : "Failed"}</p>
+                    <p className="timeline-detail">{entry.remarks}</p>
+                    <p className="actor-copy timeline-detail">
+                      Verified by: {findAccountLabel(entry.verifiedBy, accounts)} ({shortAddress(entry.verifiedBy)})
+                    </p>
+                    {renderAddressToggle(`verification-${entry.timestamp}-${index}`, [
+                      { label: "Verified by", value: entry.verifiedBy }
+                    ])}
+                  </li>
+                ))}
+              </ol>
+            </section>
           </div>
         </section>
       </main>
