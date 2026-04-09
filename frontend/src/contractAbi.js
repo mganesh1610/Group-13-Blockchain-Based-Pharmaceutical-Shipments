@@ -12,7 +12,8 @@ export const supplyChainAbi = [
   "function getBatch(string batchId) view returns ((string batchId, string productName, string origin, uint256 manufactureDate, address manufacturer, address currentCustodian, uint8 status, bool exists))",
   "function getCustodyHistory(string batchId) view returns ((address from, address to, uint256 timestamp, string location, string notes)[])",
   "function getConditionHistory(string batchId) view returns ((bytes32 logHash, string logURI, bool breachFlag, string summary, uint256 timestamp, address submittedBy)[])",
-  "function getVerificationHistory(string batchId) view returns ((string verificationType, bool result, string remarks, uint256 timestamp, address verifiedBy)[])"
+  "function getVerificationHistory(string batchId) view returns ((string verificationType, bool result, string remarks, uint256 timestamp, address verifiedBy)[])",
+  "function getAllBatchIds() view returns (string[])"
 ];
 
 export const statusLabels = ["Created", "Shipped", "Received", "Stored", "Delivered", "Flagged"];
