@@ -281,118 +281,119 @@ export default function App() {
         </p>
       </header>
 
-      <main className="grid">
-        <section className="card">
-          <h2>1. Local Setup</h2>
-          <label>
-            Local RPC URL
-            <input value={rpcUrl} onChange={(event) => setRpcUrl(event.target.value)} />
-          </label>
-          <label>
-            Contract Address
-            <input
-              value={contractAddress}
-              onChange={(event) => setContractAddress(event.target.value)}
-              placeholder="Run npm.cmd run deploy:local first"
-            />
-          </label>
-          <label>
-            Batch ID
-            <input value={batchId} onChange={(event) => setBatchId(event.target.value)} />
-          </label>
-          <button onClick={connectToLocalNode} disabled={isBusy}>
-            Connect to Local Node
-          </button>
-          <div className="account-list">
-            <strong>Detected Accounts</strong>
-            <p className="helper-copy">
-              These are local Hardhat test accounts. Account 0 acts as admin, then Accounts 1 to 4 are used as
-              manufacturer, distributor, retailer, and regulator for the demo.
-            </p>
-            {accounts.length === 0 ? <p>No accounts loaded yet.</p> : null}
-            {accounts.map((account, index) => (
-              <div key={account} className="account-row">
-                <span>{accountLabels[index] ? `Account ${index} (${accountLabels[index]})` : `Account ${index}`}</span>
-                <div className="account-actions">
-                  <code>{shortAddress(account)}</code>
-                  <button
-                    type="button"
-                    className="secondary-button inline-button"
-                    onClick={() => copyAddress(account, accountLabels[index] || `Account ${index}`)}
-                  >
-                    Copy
-                  </button>
+      <main className="operations-board">
+        <section className="board-top">
+          <section className="panel panel-operations card">
+            <h2>1. Local Setup</h2>
+            <label>
+              Local RPC URL
+              <input value={rpcUrl} onChange={(event) => setRpcUrl(event.target.value)} />
+            </label>
+            <label>
+              Contract Address
+              <input
+                value={contractAddress}
+                onChange={(event) => setContractAddress(event.target.value)}
+                placeholder="Run npm.cmd run deploy:local first"
+              />
+            </label>
+            <label>
+              Batch ID
+              <input value={batchId} onChange={(event) => setBatchId(event.target.value)} />
+            </label>
+            <button onClick={connectToLocalNode} disabled={isBusy}>
+              Connect to Local Node
+            </button>
+            <div className="account-list">
+              <strong>Detected Accounts</strong>
+              <p className="helper-copy">
+                These are local Hardhat test accounts. Account 0 acts as admin, then Accounts 1 to 4 are used as
+                manufacturer, distributor, retailer, and regulator for the demo.
+              </p>
+              {accounts.length === 0 ? <p>No accounts loaded yet.</p> : null}
+              {accounts.map((account, index) => (
+                <div key={account} className="account-row">
+                  <span>{accountLabels[index] ? `Account ${index} (${accountLabels[index]})` : `Account ${index}`}</span>
+                  <div className="account-actions">
+                    <code>{shortAddress(account)}</code>
+                    <button
+                      type="button"
+                      className="secondary-button inline-button"
+                      onClick={() => copyAddress(account, accountLabels[index] || `Account ${index}`)}
+                    >
+                      Copy
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="card">
-          <h2>2. Stakeholder Flow</h2>
-          <div className="button-stack">
-            <button onClick={grantRoles} disabled={isBusy || accounts.length < 5}>
-              Grant Demo Roles
-            </button>
-            <button onClick={registerBatch} disabled={isBusy || accounts.length < 5}>
-              Register Batch as Manufacturer
-            </button>
-            <button onClick={moveToDistributor} disabled={isBusy || accounts.length < 5}>
-              Transfer to Distributor + Anchor Condition
-            </button>
-            <button onClick={completeDelivery} disabled={isBusy || accounts.length < 5}>
-              Deliver to Retailer + Regulator Verify
-            </button>
-            <button onClick={refreshBatchDetails} disabled={isBusy || accounts.length < 1}>
-              Refresh Batch Details
-            </button>
-          </div>
-          {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
-          <div className="log-box">
-            <strong>Recent Actions</strong>
-            {logLines.length === 0 ? <p>No actions yet.</p> : null}
-            {logLines.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-          </div>
-        </section>
-
-        <section className="card">
-          <h2>3. Batch Summary</h2>
-          {!batch ? (
-            <p>Load a batch after running at least the register step.</p>
-          ) : (
-            <div className="summary-grid">
-              <div>
-                <span className="label">Batch ID</span>
-                <strong>{batch.batchId}</strong>
-              </div>
-              <div>
-                <span className="label">Product</span>
-                <strong>{batch.productName}</strong>
-              </div>
-              <div>
-                <span className="label">Origin</span>
-                <strong>{batch.origin}</strong>
-              </div>
-              <div>
-                <span className="label">Status</span>
-                <strong>{statusLabels[Number(batch.status)]}</strong>
-              </div>
-              <div>
-                <span className="label">Manufacturer</span>
-                <strong>{shortAddress(batch.manufacturer)}</strong>
-              </div>
-              <div>
-                <span className="label">Current Custodian</span>
-                <strong>{shortAddress(batch.currentCustodian)}</strong>
-              </div>
+              ))}
             </div>
-          )}
+          </section>
+
+          <section className="panel panel-results card">
+            <h2>2. Stakeholder Flow</h2>
+            <div className="button-stack">
+              <button onClick={grantRoles} disabled={isBusy || accounts.length < 5}>
+                Grant Demo Roles
+              </button>
+              <button onClick={registerBatch} disabled={isBusy || accounts.length < 5}>
+                Register Batch as Manufacturer
+              </button>
+              <button onClick={moveToDistributor} disabled={isBusy || accounts.length < 5}>
+                Transfer to Distributor + Anchor Condition
+              </button>
+              <button onClick={completeDelivery} disabled={isBusy || accounts.length < 5}>
+                Deliver to Retailer + Regulator Verify
+              </button>
+              <button onClick={refreshBatchDetails} disabled={isBusy || accounts.length < 1}>
+                Refresh Batch Details
+              </button>
+            </div>
+            {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
+            <section className="panel-subsection">
+              <h3>Batch Summary</h3>
+              {!batch ? (
+                <p>Load a batch after running at least the register step.</p>
+              ) : (
+                <div className="summary-grid">
+                  <div>
+                    <span className="label">Batch ID</span>
+                    <strong>{batch.batchId}</strong>
+                  </div>
+                  <div>
+                    <span className="label">Product</span>
+                    <strong>{batch.productName}</strong>
+                  </div>
+                  <div>
+                    <span className="label">Origin</span>
+                    <strong>{batch.origin}</strong>
+                  </div>
+                  <div>
+                    <span className="label">Status</span>
+                    <strong>{statusLabels[Number(batch.status)]}</strong>
+                  </div>
+                  <div>
+                    <span className="label">Manufacturer</span>
+                    <strong>{shortAddress(batch.manufacturer)}</strong>
+                  </div>
+                  <div>
+                    <span className="label">Current Custodian</span>
+                    <strong>{shortAddress(batch.currentCustodian)}</strong>
+                  </div>
+                </div>
+              )}
+            </section>
+            <section className="panel-subsection log-box">
+              <strong>Recent Actions</strong>
+              {logLines.length === 0 ? <p>No actions yet.</p> : null}
+              {logLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </section>
+          </section>
         </section>
 
-        <section className="card">
-          <h2>4. Provenance Timeline</h2>
+        <section className="panel panel-provenance card">
+          <h2>3. Provenance Timeline</h2>
           <div className="timeline-columns">
             <div>
               <h3>Custody</h3>
