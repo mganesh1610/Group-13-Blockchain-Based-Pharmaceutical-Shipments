@@ -282,8 +282,8 @@ export default function App() {
       </header>
 
       <main className="operations-board">
-        <section className="board-top grid">
-          <section className="panel panel-operations card">
+        <section className="board-top">
+          <section className="panel panel-operations">
             <h2>1. Operations</h2>
             <label>
               Local RPC URL
@@ -347,7 +347,7 @@ export default function App() {
             {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
           </section>
 
-          <section className="panel panel-results card">
+          <section className="panel panel-results">
             <h2>2. Results</h2>
             <section className="panel-subsection">
               <h3>Batch Summary</h3>
@@ -392,7 +392,7 @@ export default function App() {
           </section>
         </section>
 
-        <section className="panel panel-provenance card" style={{ marginTop: "1rem" }}>
+        <section className="panel panel-provenance">
           <h2>3. Provenance Timeline</h2>
           <div className="timeline-columns">
             <div>
