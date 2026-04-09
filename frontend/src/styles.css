@@ -32,6 +32,12 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.secondary-button {
+  background: #edf6f8;
+  color: #146c78;
+  border: 1px solid #b7d6dc;
+}
+
 input {
   width: 100%;
   margin-top: 0.4rem;
@@ -125,6 +131,18 @@ code {
   justify-content: space-between;
   gap: 1rem;
   margin-top: 0.5rem;
+  align-items: center;
+}
+
+.account-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inline-button {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.9rem;
 }
 
 .support-copy {
@@ -169,6 +187,41 @@ code {
   border-left: 3px solid #146c78;
   padding: 0.2rem 0 0.2rem 0.85rem;
   margin-bottom: 1rem;
+  min-width: 0;
+}
+
+.address-toggle-block {
+  margin: 0.5rem 0;
+}
+
+.address-details {
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  background: #f4fafb;
+  border-radius: 10px;
+}
+
+.address-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.45rem;
+  min-width: 0;
+}
+
+.address-detail-row:first-child {
+  margin-top: 0;
+}
+
+.address-detail-row code,
+.actor-copy,
+.timeline-item code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.actor-copy {
+  color: #47616b;
 }
 
 @media (max-width: 900px) {

@@ -53,6 +53,7 @@ export default function App() {
   const [logLines, setLogLines] = useState([]);
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [visibleAddresses, setVisibleAddresses] = useState({});
 
   useEffect(() => {
     loadSavedContractAddress().then((address) => {
@@ -64,6 +65,48 @@ export default function App() {
 
   function pushLog(message) {
     setLogLines((current) => [`${new Date().toLocaleTimeString()} - ${message}`, ...current].slice(0, 10));
+  }
+
+  function toggleAddress(key) {
+    setVisibleAddresses((current) => ({
+      ...current,
+      [key]: !current[key]
+    }));
+  }
+
+  async function copyAddress(address, label) {
+    try {
+      await navigator.clipboard.writeText(address);
+      pushLog(`Copied ${label} address.`);
+    } catch (error) {
+      setErrorMessage(error.message || "Could not copy the address.");
+    }
+  }
+
+  function renderAddressToggle(key, rows) {
+    const isVisible = Boolean(visibleAddresses[key]);
+
+    return (
+      <div className="address-toggle-block">
+        <button
+          type="button"
+          className="secondary-button inline-button"
+          onClick={() => toggleAddress(key)}
+        >
+          {isVisible ? "Hide Address" : "Show Address"}
+        </button>
+        {isVisible ? (
+          <div className="address-details">
+            {rows.map(({ label, value }) => (
+              <div key={`${key}-${label}`} className="address-detail-row">
+                <span>{label}</span>
+                <code>{value}</code>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   async function connectToLocalNode() {
@@ -270,7 +313,16 @@ export default function App() {
             {accounts.map((account, index) => (
               <div key={account} className="account-row">
                 <span>{accountLabels[index] ? `Account ${index} (${accountLabels[index]})` : `Account ${index}`}</span>
-                <code>{shortAddress(account)}</code>
+                <div className="account-actions">
+                  <code>{shortAddress(account)}</code>
+                  <button
+                    type="button"
+                    className="secondary-button inline-button"
+                    onClick={() => copyAddress(account, accountLabels[index] || `Account ${index}`)}
+                  >
+                    Copy
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -348,8 +400,15 @@ export default function App() {
               {custodyHistory.map((entry, index) => (
                 <div key={`${entry.timestamp}-${index}`} className="timeline-item">
                   <strong>{findAccountLabel(entry.from, accounts)} to {findAccountLabel(entry.to, accounts)}</strong>
+                  <p className="actor-copy">
+                    {shortAddress(entry.from)} to {shortAddress(entry.to)}
+                  </p>
                   <p>{entry.location}</p>
                   <p>{entry.notes}</p>
+                  {renderAddressToggle(`custody-${entry.timestamp}-${index}`, [
+                    { label: "From", value: entry.from },
+                    { label: "To", value: entry.to }
+                  ])}
                   <p>{formatTimestamp(entry.timestamp)}</p>
                 </div>
               ))}
@@ -362,7 +421,12 @@ export default function App() {
                   <strong>{entry.breachFlag ? "Breach" : "Normal Log"}</strong>
                   <p>{entry.summary}</p>
                   <p>{entry.logURI}</p>
-                  <p>Submitted by: {findAccountLabel(entry.submittedBy, accounts)}</p>
+                  <p className="actor-copy">
+                    Submitted by: {findAccountLabel(entry.submittedBy, accounts)} ({shortAddress(entry.submittedBy)})
+                  </p>
+                  {renderAddressToggle(`condition-${entry.timestamp}-${index}`, [
+                    { label: "Submitted by", value: entry.submittedBy }
+                  ])}
                   <p>{formatTimestamp(entry.timestamp)}</p>
                 </div>
               ))}
@@ -375,7 +439,12 @@ export default function App() {
                   <strong>{entry.verificationType}</strong>
                   <p>{entry.result ? "Passed" : "Failed"}</p>
                   <p>{entry.remarks}</p>
-                  <p>Verified by: {findAccountLabel(entry.verifiedBy, accounts)}</p>
+                  <p className="actor-copy">
+                    Verified by: {findAccountLabel(entry.verifiedBy, accounts)} ({shortAddress(entry.verifiedBy)})
+                  </p>
+                  {renderAddressToggle(`verification-${entry.timestamp}-${index}`, [
+                    { label: "Verified by", value: entry.verifiedBy }
+                  ])}
                   <p>{formatTimestamp(entry.timestamp)}</p>
                 </div>
               ))}
