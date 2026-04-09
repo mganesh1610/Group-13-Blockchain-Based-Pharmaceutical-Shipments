@@ -284,7 +284,7 @@ export default function App() {
       <main className="operations-board">
         <section className="board-top">
           <section className="panel panel-operations card">
-            <h2>1. Local Setup</h2>
+            <h2>1. Operations</h2>
             <label>
               Local RPC URL
               <input value={rpcUrl} onChange={(event) => setRpcUrl(event.target.value)} />
@@ -327,10 +327,6 @@ export default function App() {
                 </div>
               ))}
             </div>
-          </section>
-
-          <section className="panel panel-results card">
-            <h2>2. Stakeholder Flow</h2>
             <div className="button-stack">
               <button onClick={grantRoles} disabled={isBusy || accounts.length < 5}>
                 Grant Demo Roles
@@ -349,6 +345,10 @@ export default function App() {
               </button>
             </div>
             {errorMessage ? <p className="error-box">{errorMessage}</p> : null}
+          </section>
+
+          <section className="panel panel-results card">
+            <h2>2. Results</h2>
             <section className="panel-subsection">
               <h3>Batch Summary</h3>
               {!batch ? (
