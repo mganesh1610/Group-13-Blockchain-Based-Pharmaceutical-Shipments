@@ -1,6 +1,6 @@
 const hre = require("hardhat");
 
-const STATUS_LABELS = ["Created", "Shipped", "Received", "Stored", "Delivered", "Flagged"];
+const STATUS_LABELS = ["Created", "Shipped", "Received", "Stored", "Delivered", "Flagged", "Recalled"];
 
 async function main() {
   const [admin, manufacturer, distributor, retailer, regulator] = await hre.ethers.getSigners();
@@ -67,6 +67,12 @@ async function main() {
   await (
     await contract
       .connect(retailer)
+      .updateStatus("BATCH001", 2, "Batch received by retailer")
+  ).wait();
+
+  await (
+    await contract
+      .connect(retailer)
       .updateStatus("BATCH001", 4, "Batch delivered to retailer")
   ).wait();
   console.log("5. Retailer received the batch and marked it Delivered");
@@ -82,12 +88,14 @@ async function main() {
   const custodyHistory = await contract.getCustodyHistory("BATCH001");
   const conditionHistory = await contract.getConditionHistory("BATCH001");
   const verificationHistory = await contract.getVerificationHistory("BATCH001");
+  const recallInfo = await contract.getRecallInfo("BATCH001");
 
   console.log("\nFinal batch summary");
   console.log("  Batch ID:", batch.batchId);
   console.log("  Product:", batch.productName);
   console.log("  Status:", STATUS_LABELS[Number(batch.status)]);
   console.log("  Current Custodian:", batch.currentCustodian);
+  console.log("  Recalled:", recallInfo.isRecalled);
   console.log("  Custody records:", custodyHistory.length);
   console.log("  Condition records:", conditionHistory.length);
   console.log("  Verification records:", verificationHistory.length);

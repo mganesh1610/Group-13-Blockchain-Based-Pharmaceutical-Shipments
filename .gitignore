@@ -8,3 +8,5 @@ coverage/
 .env
 .env.*
 !.env.example
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep

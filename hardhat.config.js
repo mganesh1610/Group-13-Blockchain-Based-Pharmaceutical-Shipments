@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("hardhat-gas-reporter");
 require("dotenv").config();
 
 const { AMOY_RPC_URL, PRIVATE_KEY } = process.env;
@@ -13,5 +14,10 @@ if (AMOY_RPC_URL) {
 
 module.exports = {
   solidity: "0.8.20",
-  networks
+  networks,
+  gasReporter: {
+    enabled: process.env.REPORT_GAS === "true",
+    currency: "USD",
+    showTimeSpent: true
+  }
 };

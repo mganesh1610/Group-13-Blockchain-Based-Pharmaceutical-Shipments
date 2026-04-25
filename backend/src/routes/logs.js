@@ -1,0 +1,75 @@
+const fs = require("fs");
+const path = require("path");
+const express = require("express");
+const multer = require("multer");
+const { saveLogBuffer, verifyLog, uploadDir } = require("../services/logService");
+const { simulateLog } = require("../services/simulatorService");
+
+const router = express.Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024
+  }
+});
+
+router.post("/upload", upload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "IoT log file is required" });
+    }
+
+    const result = await saveLogBuffer({
+      buffer: req.file.buffer,
+      originalName: req.file.originalname,
+      batchId: req.body.batchId,
+      scenario: req.body.scenario || "upload",
+      source: "upload"
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/simulate", async (req, res, next) => {
+  try {
+    const result = await simulateLog({
+      batchId: req.body.batchId,
+      scenario: req.body.scenario,
+      readingCount: req.body.readingCount
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/verify", upload.single("file"), async (req, res, next) => {
+  try {
+    const result = await verifyLog({
+      buffer: req.file ? req.file.buffer : null,
+      filename: req.body.filename,
+      expectedHash: req.body.expectedHash
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/:filename", (req, res) => {
+  const safeFilename = path.basename(req.params.filename);
+  const filePath = path.join(uploadDir, safeFilename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: "Log file not found" });
+  }
+
+  return res.sendFile(filePath);
+});
+
+module.exports = router;
