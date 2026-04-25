@@ -28,7 +28,7 @@ describe("ColdChain Provenance app", () => {
     expect(screen.getByRole("button", { name: /connect stakeholder wallet/i })).toBeInTheDocument();
   });
 
-  it("presents production stakeholder access before local demo tooling", () => {
+  it("presents production stakeholder access before sandbox tooling", () => {
     render(<App />);
 
     const sidebar = screen.getByRole("complementary", { name: /control sidebar/i });
@@ -39,7 +39,7 @@ describe("ColdChain Provenance app", () => {
     expect(within(sidebar).getByLabelText(/batch id/i)).toHaveValue("BATCH001");
     expect(within(sidebar).getByRole("link", { name: /manufacturer portal/i })).toBeInTheDocument();
     expect(within(sidebar).getByRole("link", { name: /regulator review/i })).toBeInTheDocument();
-    expect(within(sidebar).getByText(/local demo tools/i)).toBeInTheDocument();
+    expect(within(sidebar).getByText(/developer sandbox/i)).toBeInTheDocument();
   });
 
   it("exposes all final project pages through primary navigation", () => {
@@ -49,29 +49,46 @@ describe("ColdChain Provenance app", () => {
 
     [
       "Dashboard",
-      "Register",
-      "Transfer",
-      "Status",
-      "Conditions",
-      "Regulator",
+      "Admin Access",
+      "Register Batch",
+      "Transfer Custody",
+      "Status Update",
+      "Condition Logs",
+      "Regulator Review",
       "Batch Trace",
       "Consumer Verify",
-      "Tamper Check",
-      "Demo Flow"
+      "Tamper Check"
     ].forEach((label) => {
       expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
     });
   });
 
+  it("renders admin controls for granting and removing stakeholder roles", () => {
+    render(<App />);
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+
+    fireEvent.click(within(nav).getByRole("link", { name: "Admin Access" }));
+
+    expect(screen.getByRole("heading", { name: /stakeholder access control/i })).toBeInTheDocument();
+    expect(screen.getByText(/only an admin wallet can grant or revoke roles/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/wallet address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/access role/i)).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /check role/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /grant access/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove access/i })).toBeInTheDocument();
+  });
+
   it("renders MetaMask write forms for registration and regulator actions", () => {
     render(<App />);
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
 
-    fireEvent.click(screen.getByRole("link", { name: "Register" }));
+    fireEvent.click(within(nav).getByRole("link", { name: "Register Batch" }));
 
     expect(screen.getByRole("heading", { name: /register batch/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /submit registerbatch/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("link", { name: "Regulator" }));
+    fireEvent.click(within(nav).getByRole("link", { name: "Regulator Review" }));
 
     expect(screen.getByRole("heading", { name: /add verification/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /submit recallbatch/i })).toBeInTheDocument();

@@ -5,6 +5,7 @@ export const supplyChainAbi = [
   "function REGULATOR_ROLE() view returns (bytes32)",
   "function hasRole(bytes32 role, address account) view returns (bool)",
   "function grantRole(bytes32 role, address account)",
+  "function revokeRole(bytes32 role, address account)",
   "function registerBatch(string batchId, string productName, string origin, uint256 manufactureDate)",
   "function transferCustody(string batchId, address to, string location, string notes)",
   "function updateStatus(string batchId, uint8 newStatus, string notes)",

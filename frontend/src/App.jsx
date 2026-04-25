@@ -14,17 +14,25 @@ const STATUS_OPTIONS = statusLabels
   .map((label, value) => ({ label, value }))
   .filter((status) => status.value > 0 && status.value < 6);
 
+const stakeholderRoleOptions = [
+  { key: "admin", label: "Admin", roleHash: ethers.ZeroHash },
+  { key: "manufacturer", label: "Manufacturer", roleName: "MANUFACTURER_ROLE" },
+  { key: "distributor", label: "Distributor", roleName: "DISTRIBUTOR_ROLE" },
+  { key: "retailer", label: "Retailer", roleName: "RETAILER_ROLE" },
+  { key: "regulator", label: "Regulator", roleName: "REGULATOR_ROLE" }
+];
+
 const navItems = [
   ["Dashboard", "/"],
-  ["Register", "/register"],
-  ["Transfer", "/transfer"],
-  ["Status", "/status"],
-  ["Conditions", "/conditions"],
-  ["Regulator", "/regulator"],
+  ["Admin Access", "/admin/access"],
+  ["Register Batch", "/register"],
+  ["Transfer Custody", "/transfer"],
+  ["Status Update", "/status"],
+  ["Condition Logs", "/conditions"],
+  ["Regulator Review", "/regulator"],
   ["Batch Trace", "/trace"],
   ["Consumer Verify", "/verify"],
-  ["Tamper Check", "/tamper"],
-  ["Demo Flow", "/demo"]
+  ["Tamper Check", "/tamper"]
 ];
 
 function shortAddress(address) {
@@ -46,6 +54,34 @@ function formatInputDate(value) {
 function parseError(error) {
   const message = error?.shortMessage || error?.reason || error?.message || "Unexpected error";
   return message.replace(/^execution reverted: /i, "");
+}
+
+function appUrl(path) {
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+  return `${window.location.origin}${normalizedBase}${normalizedPath}`;
+}
+
+function validateWalletAddress(address) {
+  if (!ethers.isAddress(address)) {
+    throw new Error("Enter a valid MetaMask wallet address.");
+  }
+
+  return ethers.getAddress(address);
+}
+
+async function getStakeholderRoleHash(contract, roleKey) {
+  const role = stakeholderRoleOptions.find((option) => option.key === roleKey);
+  if (!role) {
+    throw new Error("Select a valid stakeholder role.");
+  }
+
+  if (role.roleHash) {
+    return role.roleHash;
+  }
+
+  return contract[role.roleName]();
 }
 
 function normalizeBatch(batch) {
@@ -191,7 +227,7 @@ function TraceView({ trace, onCopy }) {
   }
 
   const { batch, custody, conditions, verifications, recall } = trace;
-  const verifyUrl = `${window.location.origin}/verify/${batch.batchId}`;
+  const verifyUrl = appUrl(`/verify/${batch.batchId}`);
 
   return (
     <div className="trace-stack">
@@ -360,6 +396,7 @@ function Layout({ app, children }) {
 
         <div className="rail-section workspace-links">
           <p className="eyebrow">Role Workspaces</p>
+          <NavLink to="/admin/access">Admin Access Control</NavLink>
           <NavLink to="/register">Manufacturer Portal</NavLink>
           <NavLink to="/transfer">Custody Transfer</NavLink>
           <NavLink to="/conditions">Distributor IoT Logs</NavLink>
@@ -367,31 +404,31 @@ function Layout({ app, children }) {
           <NavLink to="/verify">Consumer Verification</NavLink>
         </div>
 
-        <details className="rail-section compact demo-tools">
-          <summary>Local demo tools</summary>
+        <details className="rail-section compact sandbox-tools">
+          <summary>Developer sandbox</summary>
           <p className="rail-note">
-            Presentation shortcuts use separate local Hardhat accounts behind the scenes.
+            Local Hardhat shortcuts only. Production stakeholders use their own organization wallets.
           </p>
           <button type="button" className="secondary" onClick={app.connectLocalNetwork}>
-            Connect Local Network (Admin)
+            Connect Sandbox Network
           </button>
           <button type="button" className="secondary" onClick={app.grantDemoRoles}>
-            Grant Stakeholder Roles (Admin)
+            Assign Sandbox Roles
           </button>
           <button type="button" onClick={app.demoRegisterBatch}>
-            Register Batch (Manufacturer)
+            Run Manufacturer Step
           </button>
           <button type="button" onClick={app.demoSendToDistributor}>
-            Ship + Anchor IoT Log (Distributor)
+            Run Distributor Step
           </button>
           <button type="button" onClick={app.demoDeliverAndVerify}>
-            Deliver + Verify (Retailer + Regulator)
+            Run Retailer + Regulator Step
           </button>
           <button type="button" className="danger-soft" onClick={app.demoBreachAndRecall}>
-            Breach + Recall Demo (Regulator)
+            Run Breach + Recall Scenario
           </button>
           <button type="button" className="ghost" onClick={app.demoUnauthorizedAction}>
-            Unauthorized Action Demo
+            Run Unauthorized Action Check
           </button>
         </details>
 
@@ -409,8 +446,8 @@ function Layout({ app, children }) {
         </details>
 
         <details className="rail-section wallet-list compact">
-          <summary>Demo stakeholder addresses</summary>
-          <p className="eyebrow">Demo Stakeholders</p>
+          <summary>Sandbox stakeholder addresses</summary>
+          <p className="eyebrow">Sandbox Accounts</p>
           {app.stakeholders.map((stakeholder) => (
             <div className="wallet-row" key={stakeholder.role}>
               <strong>{stakeholder.role}</strong>
@@ -544,10 +581,153 @@ function Metric({ label, value, tone = "normal" }) {
   );
 }
 
+function AdminAccessPage({ app }) {
+  const [form, setForm] = useState({
+    walletAddress: "",
+    role: stakeholderRoleOptions[0].key
+  });
+  const [roleStatus, setRoleStatus] = useState(null);
+  const selectedRole = stakeholderRoleOptions.find((role) => role.key === form.role) || stakeholderRoleOptions[0];
+
+  async function checkRole(event) {
+    event.preventDefault();
+
+    try {
+      const wallet = validateWalletAddress(form.walletAddress);
+      if (!app.readContract) {
+        throw new Error("Contract connection is not ready.");
+      }
+
+      const roleHash = await getStakeholderRoleHash(app.readContract, form.role);
+      const hasAccess = await app.readContract.hasRole(roleHash, wallet);
+      setRoleStatus({ wallet, role: selectedRole.label, hasAccess });
+      app.setNotice({
+        type: hasAccess ? "success" : "warning",
+        message: `${shortAddress(wallet)} ${hasAccess ? "has" : "does not have"} ${selectedRole.label} access.`
+      });
+    } catch (error) {
+      app.setNotice({ type: "error", message: parseError(error) });
+    }
+  }
+
+  async function grantAccess() {
+    try {
+      const wallet = validateWalletAddress(form.walletAddress);
+      await app.runWalletWrite(`Grant ${selectedRole.label} access`, async (contract) => {
+        const roleHash = await getStakeholderRoleHash(contract, form.role);
+        const tx = await contract.grantRole(roleHash, wallet);
+        await tx.wait();
+        const hasAccess = await contract.hasRole(roleHash, wallet);
+        setRoleStatus({ wallet, role: selectedRole.label, hasAccess });
+        await app.refreshConnectedWalletRoles();
+      });
+    } catch (error) {
+      app.setNotice({ type: "error", message: parseError(error) });
+    }
+  }
+
+  async function removeAccess() {
+    try {
+      const wallet = validateWalletAddress(form.walletAddress);
+      await app.runWalletWrite(`Remove ${selectedRole.label} access`, async (contract) => {
+        const roleHash = await getStakeholderRoleHash(contract, form.role);
+        const tx = await contract.revokeRole(roleHash, wallet);
+        await tx.wait();
+        const hasAccess = await contract.hasRole(roleHash, wallet);
+        setRoleStatus({ wallet, role: selectedRole.label, hasAccess });
+        await app.refreshConnectedWalletRoles();
+      });
+    } catch (error) {
+      app.setNotice({ type: "error", message: parseError(error) });
+    }
+  }
+
+  return (
+    <section className="page-grid">
+      <form className="page-card form-card" onSubmit={checkRole}>
+        <p className="eyebrow">Admin Workspace</p>
+        <h2>Stakeholder Access Control</h2>
+        <p className="muted">
+          Paste a MetaMask address, select the access role, then grant or remove access on-chain. Only an admin wallet
+          can grant or revoke roles.
+        </p>
+
+        <Field label="Wallet Address">
+          <input
+            value={form.walletAddress}
+            onChange={(event) => setForm({ ...form, walletAddress: event.target.value })}
+            placeholder="0x..."
+          />
+        </Field>
+
+        <Field label="Access Role">
+          <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
+            {stakeholderRoleOptions.map((role) => (
+              <option key={role.key} value={role.key}>
+                {role.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="button-row role-actions">
+          <button type="submit" className="secondary">
+            Check Role
+          </button>
+          <button type="button" onClick={grantAccess}>
+            Grant Access
+          </button>
+          <button type="button" className="danger-soft" onClick={removeAccess}>
+            Remove Access
+          </button>
+        </div>
+      </form>
+
+      <div className="page-card">
+        <p className="eyebrow">Contract RBAC</p>
+        <h2>How Access Is Enforced</h2>
+        <p className="muted">
+          This screen calls OpenZeppelin AccessControl functions on the deployed contract. The UI can request a role
+          change, but the transaction succeeds only when the connected wallet has the contract admin role.
+        </p>
+
+        {roleStatus ? (
+          <div className={`role-result ${roleStatus.hasAccess ? "granted" : "missing"}`}>
+            <span>{roleStatus.role}</span>
+            <strong>{roleStatus.hasAccess ? "Access granted" : "Access not assigned"}</strong>
+            <code className="breakable">{roleStatus.wallet}</code>
+          </div>
+        ) : (
+          <div className="plain-result">
+            <strong>No wallet checked yet.</strong>
+            <p className="muted">Use Check Role to verify whether a pasted address already has the selected role.</p>
+          </div>
+        )}
+
+        <div className="admin-note">
+          <strong>Production pattern</strong>
+          <p>
+            Each stakeholder keeps their own MetaMask wallet. The admin grants the role once; after that, the
+            stakeholder can connect from any computer and the contract recognizes their wallet address.
+          </p>
+        </div>
+
+        <div className="warning-panel">
+          <strong>Admin safety</strong>
+          <p>
+            Do not remove the last admin wallet. If every admin role is revoked, no one can grant or remove access
+            without redeploying the contract.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RegisterPage({ app }) {
   const [form, setForm] = useState({
     batchId: app.activeBatchId,
-    productName: "Course Demo Vaccine Batch",
+    productName: "Temperature-Sensitive Vaccine Batch",
     origin: "Phoenix, AZ",
     manufactureDate: formatInputDate(Math.floor(Date.now() / 1000))
   });
@@ -1018,11 +1198,11 @@ function DemoFlowPage({ app }) {
   return (
     <section className="page-grid">
       <div className="page-card wide">
-        <p className="eyebrow">Presentation Flow</p>
+        <p className="eyebrow">Sandbox Runbook</p>
         <h2>End-to-End Stakeholder Workflow</h2>
         <p>
-          Use the left rail for the fast browser demo. Each button uses a different local Hardhat account: admin,
-          manufacturer, distributor, retailer, and regulator.
+          This runbook is for local validation only. In production, each organization connects its own wallet and
+          signs only the transactions allowed by its contract role.
         </p>
         <div className="workflow-strip">
           <span>Admin grants roles</span>
@@ -1151,7 +1331,7 @@ function ColdChainApp() {
   async function connectWallet() {
     try {
       if (!window.ethereum) {
-        throw new Error("MetaMask is not available. Use the local demo rail or install MetaMask.");
+        throw new Error("MetaMask is not available. Install MetaMask to use stakeholder wallet access.");
       }
 
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
@@ -1173,6 +1353,16 @@ function ColdChainApp() {
     } catch (error) {
       setNotice({ type: "error", message: parseError(error) });
     }
+  }
+
+  async function refreshConnectedWalletRoles() {
+    if (!signerContract || !walletAddress) {
+      return [];
+    }
+
+    const roles = await detectWalletRoles(signerContract, walletAddress);
+    setWalletRoles(roles);
+    return roles;
   }
 
   async function getLocalActors() {
@@ -1249,7 +1439,7 @@ function ColdChainApp() {
       const contract = contractFor(actors.manufacturer);
       const tx = await contract.registerBatch(
         activeBatchId,
-        "Course Demo Vaccine Batch",
+        "Temperature-Sensitive Vaccine Batch",
         "Phoenix, AZ",
         Math.floor(Date.now() / 1000)
       );
@@ -1421,7 +1611,7 @@ function ColdChainApp() {
   async function runWalletWrite(label, action) {
     try {
       if (!signerContract) {
-        throw new Error("Connect MetaMask first, or use the local demo actions in the left rail.");
+        throw new Error("Connect MetaMask first with the stakeholder wallet assigned to this role.");
       }
       await action(signerContract);
       setNotice({ type: "success", message: `${label} completed.` });
@@ -1460,6 +1650,7 @@ function ColdChainApp() {
     demoUnauthorizedAction,
     refreshBatch,
     refreshDashboard,
+    refreshConnectedWalletRoles,
     runWalletWrite,
     callBackend,
     copyText
@@ -1469,6 +1660,7 @@ function ColdChainApp() {
     <Layout app={app}>
       <Routes>
         <Route path="/" element={<DashboardPage app={app} />} />
+        <Route path="/admin/access" element={<AdminAccessPage app={app} />} />
         <Route path="/register" element={<RegisterPage app={app} />} />
         <Route path="/transfer" element={<TransferPage app={app} />} />
         <Route path="/status" element={<StatusPage app={app} />} />
@@ -1485,8 +1677,10 @@ function ColdChainApp() {
 }
 
 export default function App() {
+  const baseName = import.meta.env.BASE_URL === "/" ? undefined : import.meta.env.BASE_URL;
+
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={baseName}>
       <ColdChainApp />
     </BrowserRouter>
   );

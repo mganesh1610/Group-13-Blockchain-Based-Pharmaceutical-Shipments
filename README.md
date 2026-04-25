@@ -17,10 +17,11 @@ The implementation is intentionally focused on provenance rather than a generic 
 
 ```text
 React + Vite UI
-  - MetaMask write pages
-  - local Hardhat demo workflow
+  - production-style stakeholder wallet access
+  - role-specific operating workspaces
   - public consumer verification route
   - QR code batch lookup
+  - collapsed local sandbox tools for course demonstration
 
 Express backend
   - simulated IoT data generation
@@ -80,6 +81,33 @@ Core functions:
 
 Access control is enforced in the smart contract. Unauthorized actions are rejected even if someone tries to call the contract outside the UI.
 
+## Production-Style Access Model
+
+The application is designed as a stakeholder portal. In a real deployment, each organization opens the same hosted web app but connects its own MetaMask wallet:
+
+- manufacturer wallet for registering batches
+- distributor wallet for shipment custody and condition log anchoring
+- retailer wallet for receiving and delivery updates
+- regulator wallet for compliance verification and recall actions
+- public consumer access without a wallet for read-only verification
+
+The computer or physical location does not determine access. The connected wallet address determines access, and the smart contract checks whether that address has the required role.
+
+For local development, Hardhat accounts simulate those different stakeholder wallets. The UI keeps those shortcuts under `Developer sandbox` so the main product experience remains production-facing.
+
+## Grant or Remove Stakeholder Access
+
+Open `Admin Access` in the app to manage stakeholder wallets from the frontend:
+
+1. Connect the admin MetaMask wallet.
+2. Paste the stakeholder's public wallet address.
+3. Select `Admin`, `Manufacturer`, `Distributor`, `Retailer`, or `Regulator`.
+4. Click `Grant Access` to call `grantRole` on the smart contract.
+5. Click `Check Role` to confirm the address has the selected role.
+6. Click `Remove Access` to call `revokeRole` when a stakeholder should no longer have that role.
+
+Only an address with the contract admin role can grant or revoke access. If any other wallet tries this, the contract rejects the transaction. Do not revoke the last admin wallet, because that would lock role management until the contract is redeployed.
+
 ## Local Setup
 
 Install root blockchain dependencies:
@@ -134,28 +162,28 @@ npm run dev:frontend
 
 Open the Vite URL shown by the frontend terminal, usually `http://localhost:5173`.
 
-## Browser Demo Flow
+## Local Sandbox Flow
 
-The fastest presentation flow is available in the left control rail:
+The production flow should be demonstrated through the role pages and stakeholder wallet access. For a fast local recording, the same actions are available under the collapsed `Developer sandbox` section in the left rail:
 
-1. `Connect Local Network (Admin)`
-2. `Grant Stakeholder Roles (Admin)`
-3. `Register Batch (Manufacturer)`
-4. `Ship + Anchor IoT Log (Distributor)`
-5. `Deliver + Verify (Retailer + Regulator)`
+1. `Connect Sandbox Network`
+2. `Assign Sandbox Roles`
+3. `Run Manufacturer Step`
+4. `Run Distributor Step`
+5. `Run Retailer + Regulator Step`
 6. Open `Batch Trace` to view the complete provenance timeline.
 7. Open `Consumer Verify` or scan the QR code from `Batch Trace`.
-8. Use `Breach + Recall Demo (Regulator)` to show exception handling.
-9. Use `Unauthorized Action Demo` to show contract-level role rejection.
+8. Use `Run Breach + Recall Scenario` to show exception handling.
+9. Use `Run Unauthorized Action Check` to show contract-level role rejection.
 
-The local browser demo uses default Hardhat accounts:
+The local sandbox uses default Hardhat accounts:
 
 - Account 0: Admin
 - Account 1: Manufacturer
 - Account 2: Distributor
 - Account 3: Retailer
 - Account 4: Regulator
-- Account 5: Consumer demo account
+- Account 5: Consumer sandbox account
 
 ## Backend API
 
@@ -237,7 +265,42 @@ Then deploy to Polygon Amoy:
 npm run deploy -- --network amoy
 ```
 
+For the frontend to read the Amoy contract, set these frontend environment values before building or hosting the UI:
+
+```text
+VITE_RPC_URL=https://rpc-amoy.polygon.technology/
+VITE_CONTRACT_ADDRESS=<deployed Amoy contract address>
+VITE_BACKEND_URL=<your backend API URL>
+```
+
 Do not commit private keys or real secrets.
+
+## GitHub Pages Hosting
+
+GitHub Pages can host the React frontend as a public static site. It cannot host the Express backend, so public upload/simulation/tamper-check APIs need a separate backend host if those features must work outside your machine.
+
+The repository includes a GitHub Actions workflow at `.github/workflows/deploy-pages.yml`. To use it:
+
+1. Deploy the contract to Polygon Amoy and copy the contract address.
+2. In GitHub, open `Settings` -> `Secrets and variables` -> `Actions` -> `Variables`.
+3. Add these repository variables:
+
+```text
+VITE_RPC_URL=https://rpc-amoy.polygon.technology/
+VITE_CONTRACT_ADDRESS=<deployed Amoy contract address>
+VITE_BACKEND_URL=<hosted backend URL, or leave blank for blockchain-only public demo>
+```
+
+4. Open `Settings` -> `Pages` and set the source to `GitHub Actions`.
+5. Push to `main`, or manually run the `Deploy Frontend to GitHub Pages` workflow.
+
+The hosted URL will be:
+
+```text
+https://mganesh1610.github.io/Group-13-Blockchain-Based-Pharmaceutical-Shipments/
+```
+
+Because the app is a single-page React app, the workflow also publishes a `404.html` fallback so shared batch/QR links such as `/verify/BATCH001` can load through GitHub Pages.
 
 ## Why Blockchain Helps Here
 

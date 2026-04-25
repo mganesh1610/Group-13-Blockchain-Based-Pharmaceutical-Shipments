@@ -355,7 +355,7 @@ code {
   background: var(--color-cold-container);
 }
 
-.demo-tools {
+.sandbox-tools {
   gap: 0.56rem;
 }
 
@@ -930,6 +930,51 @@ code {
 .mismatch-result {
   color: var(--color-danger);
   background: var(--color-danger-container);
+}
+
+.role-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.role-actions button {
+  min-width: 150px;
+}
+
+.role-result {
+  display: grid;
+  gap: 0.45rem;
+  border-radius: var(--radius-lg);
+  padding: 0.82rem;
+  border: 1px solid var(--color-line);
+}
+
+.role-result span {
+  color: var(--color-secondary);
+  font-weight: 800;
+}
+
+.role-result.granted {
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border-color: rgba(42, 124, 85, 0.26);
+}
+
+.role-result.missing {
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border-color: rgba(154, 90, 0, 0.26);
+}
+
+.admin-note {
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  padding: 0.82rem;
+  background: rgba(214, 238, 239, 0.36);
+}
+
+.admin-note p {
+  margin-bottom: 0;
 }
 
 .workflow-strip {

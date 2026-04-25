@@ -8,6 +8,7 @@ const networks = {};
 if (AMOY_RPC_URL) {
   networks.amoy = {
     url: AMOY_RPC_URL,
+    chainId: 80002,
     accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
   };
 }
