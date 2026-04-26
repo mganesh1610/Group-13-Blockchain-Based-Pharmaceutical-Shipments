@@ -5,6 +5,12 @@ build/
 artifacts/
 cache/
 coverage/
+logs/
+*.log
 .env
 .env.*
 !.env.example
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep
+
+.vercel

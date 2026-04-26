@@ -5,9 +5,14 @@ const hre = require("hardhat");
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   const adminAddress = process.env.ADMIN_ADDRESS || deployer.address;
+  const deployOptions = {};
+
+  if (process.env.DEPLOY_GAS_PRICE_GWEI) {
+    deployOptions.gasPrice = hre.ethers.parseUnits(process.env.DEPLOY_GAS_PRICE_GWEI, "gwei");
+  }
 
   const SupplyChainProvenance = await hre.ethers.getContractFactory("SupplyChainProvenance");
-  const contract = await SupplyChainProvenance.deploy(adminAddress);
+  const contract = await SupplyChainProvenance.deploy(adminAddress, deployOptions);
   await contract.waitForDeployment();
 
   console.log("SupplyChainProvenance deployed");

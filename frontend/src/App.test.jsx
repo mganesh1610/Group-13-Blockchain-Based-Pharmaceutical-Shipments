@@ -2,12 +2,15 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
-describe("App shell", () => {
+describe("ColdChain Provenance app", () => {
   beforeEach(() => {
+    window.history.pushState({}, "", "/");
+
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
-        ok: false
+        ok: false,
+        json: vi.fn().mockResolvedValue({})
       })
     );
 
@@ -18,95 +21,87 @@ describe("App shell", () => {
     });
   });
 
-  it("shows a launch-ready product header and keeps editable connection controls in the sidebar", () => {
+  it("renders a launch-ready product shell without interim-demo wording", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: /coldchain provenance/i })).toBeInTheDocument();
-    expect(screen.queryByText(/interim demo ui/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /connect network/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /grant demo roles/i })).toBeInTheDocument();
-    expect(screen.getByText(/edit connection details/i)).toBeInTheDocument();
+    expect(screen.getByText(/pharmaceutical cold chain/i)).toBeInTheDocument();
+    expect(screen.queryByText(/interim demo/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /connect stakeholder wallet/i })).toBeInTheDocument();
   });
 
-  it("keeps control center and provenance timeline together on the demo home view", () => {
-    render(<App />);
-
-    expect(screen.getByRole("heading", { name: /control center/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /shipment overview/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /provenance timeline/i })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /connection details/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/edit connection details/i)).toBeInTheDocument();
-  });
-
-  it("places the register batch action directly after the batch id field", () => {
-    render(<App />);
-
-    const batchIdField = screen.getByLabelText(/batch id/i).closest("label");
-    const registerButton = screen.getByRole("button", { name: /register batch/i });
-
-    expect(batchIdField).not.toBeNull();
-    expect(batchIdField.compareDocumentPosition(registerButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  });
-
-  it("renders the demo workspace as a fixed sidebar with the header and tabs in the content pane", () => {
+  it("presents production stakeholder access before sandbox tooling", () => {
     render(<App />);
 
     const sidebar = screen.getByRole("complementary", { name: /control sidebar/i });
-    const contentPane = screen.getByRole("region", { name: /app content/i });
 
-    expect(sidebar).toBeInTheDocument();
-    expect(contentPane).toBeInTheDocument();
-    expect(within(contentPane).getByRole("heading", { name: /coldchain provenance/i })).toBeInTheDocument();
-    expect(within(contentPane).getByRole("tab", { name: /demo/i })).toBeInTheDocument();
+    expect(within(sidebar).getByText(/stakeholder access/i)).toBeInTheDocument();
+    expect(within(sidebar).getByText(/no wallet connected/i)).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: /connect organization wallet/i })).toBeInTheDocument();
+    expect(within(sidebar).getByLabelText(/batch id/i)).toHaveValue("BATCH001");
+    expect(within(sidebar).queryByRole("link", { name: /manufacturer portal/i })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole("link", { name: /regulator review/i })).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole("link", { name: /consumer verification/i })).toBeInTheDocument();
+    expect(within(sidebar).getByText(/developer sandbox/i)).toBeInTheDocument();
   });
 
-  it("moves bootstrap actions into the header and keeps the left rail focused on the batch workflow", () => {
+  it("shows only public read-only pages before a stakeholder role is connected", () => {
     render(<App />);
 
-    const sidebar = screen.getByRole("complementary", { name: /control sidebar/i });
-    const contentPane = screen.getByRole("region", { name: /app content/i });
-    const hero = within(contentPane).getByRole("banner");
-    const shipmentOverview = within(contentPane).getByRole("heading", { name: /shipment overview/i }).closest("section");
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
 
-    expect(within(hero).getByRole("button", { name: /connect network/i })).toBeInTheDocument();
-    expect(within(hero).getByRole("button", { name: /grant demo roles/i })).toBeInTheDocument();
-    expect(within(sidebar).queryByRole("button", { name: /connect network/i })).not.toBeInTheDocument();
-    expect(within(sidebar).queryByRole("button", { name: /grant demo roles/i })).not.toBeInTheDocument();
-    expect(within(contentPane).queryByText(/^network$/i)).not.toBeInTheDocument();
-    expect(within(contentPane).queryByText(/^contract$/i)).not.toBeInTheDocument();
+    ["Dashboard", "Batch Trace", "Consumer Verify", "Tamper Check"].forEach((label) => {
+      expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
+    });
 
-    const batchIdField = within(sidebar).getByLabelText(/batch id/i).closest("label");
-    const registerButton = within(sidebar).getByRole("button", { name: /register batch/i });
-    const sendToDistributorButton = within(sidebar).getByRole("button", { name: /send to distributor/i });
-    const deliverAndVerifyButton = within(sidebar).getByRole("button", { name: /deliver .* verify/i });
-
-    expect(batchIdField.compareDocumentPosition(registerButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(registerButton.compareDocumentPosition(sendToDistributorButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(sendToDistributorButton.compareDocumentPosition(deliverAndVerifyButton)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(shipmentOverview).not.toBeNull();
-    expect(within(shipmentOverview).getByText(/active batch/i)).toBeInTheDocument();
-    expect(within(shipmentOverview).getByText(/batchui001/i)).toBeInTheDocument();
+    ["Admin Access", "Register Batch", "Transfer Custody", "Status Update", "Condition Logs", "Regulator Review"].forEach(
+      (label) => {
+        expect(within(nav).queryByRole("link", { name: label })).not.toBeInTheDocument();
+      }
+    );
   });
 
-  it("labels workflow buttons with the acting stakeholders", () => {
+  it("blocks restricted workspaces until the connected wallet has the required role", () => {
+    window.history.pushState({}, "", "/admin/access");
     render(<App />);
 
-    expect(screen.getByRole("button", { name: /connect network \(admin\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /grant demo roles \(admin\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /register batch \(manufacturer\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /send to distributor \(manufacturer -> distributor\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /deliver & verify \(retailer \+ regulator\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /admin access/i })).toBeInTheDocument();
+    expect(screen.getByText(/restricted workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/required role: admin/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /connect stakeholder wallet/i }).length).toBeGreaterThan(0);
   });
 
-  it("supports top-level navigation between demo, batch tracking, and history views", () => {
+  it("keeps MetaMask write forms behind role-specific access gates", () => {
+    window.history.pushState({}, "", "/register");
     render(<App />);
 
-    expect(screen.getByRole("tab", { name: /demo/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: /batch tracking/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /history/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /register batch/i })).toBeInTheDocument();
+    expect(screen.getByText(/required role: manufacturer/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: /history/i }));
+    window.history.pushState({}, "", "/regulator");
+    render(<App />);
 
-    expect(screen.getByRole("heading", { name: /ledger history/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /regulator review/i })).toBeInTheDocument();
+    expect(screen.getByText(/required role: regulator/i)).toBeInTheDocument();
+  });
+
+  it("keeps consumer verification read-only and wallet-free", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("link", { name: "Consumer Verify" }));
+
+    expect(screen.getByRole("heading", { name: /consumer batch check/i })).toBeInTheDocument();
+    expect(screen.getByText(/does not require metamask/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /verify batch/i })).toBeInTheDocument();
+  });
+
+  it("shows the tamper-evidence verification panel", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("link", { name: "Tamper Check" }));
+
+    expect(screen.getByRole("heading", { name: /verify off-chain log hash/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /run hash verification/i })).toBeInTheDocument();
+    expect(screen.getByText(/compare a file against the anchored digest/i)).toBeInTheDocument();
   });
 });
