@@ -441,7 +441,7 @@ function AccessGate({ app, item, children }) {
       </p>
       <div className="button-row">
         <button type="button" onClick={app.connectWallet}>
-          {app.walletAddress ? "Switch Stakeholder Wallet" : "Connect Stakeholder Wallet"}
+          {app.walletAddress ? "Reconnect Selected Wallet" : "Connect Stakeholder Wallet"}
         </button>
         {app.walletAddress ? (
           <button type="button" className="ghost" onClick={app.disconnectWallet}>
@@ -788,7 +788,7 @@ function Layout({ app, children }) {
             {app.walletAddress ? (
               <div className="session-actions">
                 <button type="button" className="secondary" onClick={app.connectWallet}>
-                  Switch Wallet
+                  Reconnect Selected Wallet
                 </button>
                 <button type="button" className="ghost" onClick={app.disconnectWallet}>
                   Logout
@@ -922,7 +922,7 @@ function Layout({ app, children }) {
             {app.walletAddress ? (
               <div className="hero-wallet-actions">
                 <button type="button" onClick={app.connectWallet}>
-                  Switch Stakeholder Wallet
+                  Reconnect Selected Wallet
                 </button>
                 <button type="button" className="ghost logout-button" onClick={app.disconnectWallet}>
                   Logout
