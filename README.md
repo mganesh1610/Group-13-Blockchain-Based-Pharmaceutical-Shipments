@@ -8,7 +8,6 @@ The goal is to show why blockchain is useful for multi-party supply chain tracea
 
 Live deployment:
 
-- Public GitHub repository: [https://github.com/mganesh1610/Group-13-Blockchain-Based-Pharmaceutical-Shipments](https://github.com/mganesh1610/Group-13-Blockchain-Based-Pharmaceutical-Shipments)
 - Web app: [https://coldchain-provenance.vercel.app](https://coldchain-provenance.vercel.app)
 - Polygon Amoy contract: `0xAFdcF244CAb9d632946c42A07463F3105B605EF0`
 - Amoy explorer: [View verified contract on PolygonScan](https://amoy.polygonscan.com/address/0xAFdcF244CAb9d632946c42A07463F3105B605EF0)
@@ -63,31 +62,24 @@ Role-specific lifecycle behavior:
 - Retailer status updates are normally used for receipt and final delivery.
 - Regulator actions are separated from logistics actions and are used for verification or recall.
 
-## System Architecture
+## Architecture Diagram
 
-```text
-React + Vite frontend
-  - stakeholder wallet connection through MetaMask
-  - admin role management page
-  - role-specific menus for admin, manufacturer, distributor, retailer, and regulator
-  - batch registration, custody transfer, status, condition, regulator, and trace pages
-  - public consumer verification and QR route
+```mermaid
+flowchart LR
+  wallets["Stakeholder Wallets<br/>Admin, Manufacturer, Distributor,<br/>Retailer, Regulator"]
+  frontend["React + Vite Frontend<br/>Role-specific pages, batch trace,<br/>consumer QR verification, tamper check"]
+  backend["Node.js + Express Backend<br/>IoT simulation/upload, breach detection,<br/>keccak256 hashing, verification API"]
+  storage["Off-chain Storage<br/>Azure Blob Storage for raw logs<br/>Azure SQL for log metadata"]
+  contract["SupplyChainProvenance Contract<br/>RBAC, custody history, statuses,<br/>condition hashes, verification, recall"]
+  consumer["Consumer Verification<br/>Public read-only batch lookup<br/>No MetaMask required"]
 
-Node.js + Express backend
-  - simulated IoT log generation
-  - JSON/CSV upload
-  - temperature breach detection
-  - keccak256 hash computation
-  - tamper verification
-  - Azure Blob Storage for raw IoT files in the live deployment
-  - Azure SQL persistence for log metadata and storage references
-  - local file fallback for development
-
-Solidity + Hardhat
-  - SupplyChainProvenance smart contract
-  - Polygon Amoy testnet deployment
-  - role-based access control
-  - custody, condition, verification, and recall history
+  wallets -->|MetaMask connect| frontend
+  frontend -->|write/read transactions| contract
+  frontend -->|IoT API calls| backend
+  backend -->|raw JSON/CSV logs| storage
+  backend -->|hash, URI, summary| frontend
+  frontend -->|anchor hash proof| contract
+  contract -->|public provenance state| consumer
 ```
 
 ## On-Chain vs Off-Chain Data
@@ -146,7 +138,7 @@ Lifecycle statuses:
 
 The contract also emits events for batch registration, custody transfers, status updates, condition anchoring, regulator verification, and recall actions. These events provide an auditable sequence of stakeholder activity that complements the stored batch history.
 
-## Course Requirements Covered
+## Implemented Scope
 
 - Multi-party lifecycle: manufacturer, distributor, retailer, regulator, and consumer.
 - Product journey: creation, shipment, storage/condition logging, delivery, verification, and recall handling.
@@ -156,7 +148,7 @@ The contract also emits events for batch registration, custody transfers, status
 - Off-chain storage: raw IoT logs stay off-chain while hashes and summaries are anchored on-chain.
 - Tamper evidence: uploaded or generated logs can be re-hashed and compared against the on-chain digest.
 
-## Repository Structure
+## Source Code Layout
 
 ```text
 contracts/          Solidity smart contract
@@ -403,7 +395,7 @@ This check is read-only and does not open MetaMask because it does not write a b
 
 `Batch Trace` is the full auditor view. It shows batch metadata, wallet addresses, custody chain, condition proofs, verification records, recall records, and the QR route. `Consumer Verify` is intentionally simpler. It summarizes whether a buyer or receiving party should trust the batch, whether a warning or recall exists, and the high-level supply-chain path.
 
-## Grader Live Testing
+## Live Site Interaction Testing
 
 The live deployment is available at:
 
@@ -417,21 +409,21 @@ The deployed Polygon Amoy contract is:
 0xAFdcF244CAb9d632946c42A07463F3105B605EF0
 ```
 
-For grading, test wallet private keys are provided separately through the private Canvas submission notes. Private keys are intentionally not committed to this public repository. The public addresses below are safe to include because they are used for role assignment on-chain.
+For live role-specific testing, test wallet private keys are provided separately through the private Canvas submission notes. Private keys are intentionally not committed to this public repository. The public addresses below are safe to include because they are used for role assignment on-chain.
 
 The following public addresses are currently recognized by the deployed Polygon Amoy contract. If a wallet does not show the expected role after import, connect an admin wallet and use `Admin Access` to grant the matching role again.
 
 | Stakeholder | Public Wallet Address | Role to Grant |
 | --- | --- | --- |
 | Admin | `0x106740923A201aCCcE412911880161760ce8B2BD` | Already contract admin |
-| Grader Admin | `0x9287E3aAB5c5939845409fd7C16044FA7eBE3B1e` | Already contract admin |
+| Test Admin | `0x9287E3aAB5c5939845409fd7C16044FA7eBE3B1e` | Already contract admin |
 | Manufacturer | `0x1AD47A780fD10074804b9b60B370FEcf4c6758A0` | `Manufacturer` |
 | Distributor | `0xce03c80C3bAac6e8A3c45fD921F090F5AEAc4066` | `Distributor` |
 | Retailer | `0x2aa428655a6F04607795b1F639307ba2F4b981EA` | `Retailer` |
 | Regulator | `0x034e46defEb4ef20452B795E7Ae6263444dbAad2` | `Regulator` |
 | Consumer | Any wallet or no wallet | No role required |
 
-Live grading setup:
+Live interaction workflow:
 
 1. Open MetaMask.
 2. Add the `Polygon Amoy Testnet` network using the details in the section above.
@@ -451,33 +443,6 @@ Live grading setup:
 16. Use `Batch Trace`, `Consumer Verify`, and `Tamper Check` to inspect the final proof trail.
 
 For the cleanest role-specific demonstration, use separate wallets for each stakeholder. If one wallet has multiple roles, the app will show the combined menu for those roles because the deployed smart contract recognizes every role assigned to that address.
-
-## Local Sandbox Demo
-
-For quick local demonstrations, the left sidebar includes a collapsed `Developer sandbox` section. It uses default Hardhat accounts:
-
-- Account 0: Admin
-- Account 1: Manufacturer
-- Account 2: Distributor
-- Account 3: Retailer
-- Account 4: Regulator
-- Account 5: Consumer
-
-Recommended local flow:
-
-1. `Connect Sandbox Network`
-2. `Assign Sandbox Roles`
-3. `Run Manufacturer Step`
-4. `Run Distributor Step`
-5. `Run Retailer + Regulator Step`
-6. Open `Batch Trace`
-7. Open `Consumer Verify`
-8. Run breach, recall, and unauthorized action checks if needed
-
-If `Assign Sandbox Roles` shows a decode or unauthorized error, check two things:
-
-- The local Hardhat node must still be running at `http://127.0.0.1:8545`.
-- The contract field in `Edit connection details` must be the local deployment, normally `0x5FbDB2315678afecb367f032d93F642f64180aa3`, not the Polygon Amoy contract address.
 
 ## Backend API
 
@@ -670,17 +635,10 @@ Metadata/hash/summary -> Azure SQL
 Hash proof -> Polygon Amoy smart contract
 ```
 
-## Security Notes
-
-- Never commit private keys or real `.env` files.
-- Never place grader wallet private keys in `README.md`, source code, screenshots, or commit history. Provide them only through the private Canvas submission notes.
-- Use a demo deployer wallet for testnet deployment.
-- Rotate any database password or storage key that was shared outside a secure channel.
-- Public Azure SQL firewall access can support this course prototype, but a production deployment should restrict access with private networking or managed platform egress controls.
-- Raw IoT files are stored in Azure Blob Storage when configured; SQL should store metadata rather than large telemetry files.
-
 ## Why Blockchain Helps
 
 In a centralized tracker, one party can edit records without a shared immutable audit trail. This system uses smart contract transactions and events so each stakeholder action is attributable, ordered, and resistant to later alteration.
+
+The consumer verification flow is useful during recalls. If a manufacturer-initiated or regulator-confirmed recall is recorded on-chain by an authorized regulator or admin, a consumer, pharmacy, or receiving team can enter the batch ID or scan the QR route to see whether that exact product batch should be used, accepted, rejected, or removed from circulation.
 
 The blockchain does not prove a physical sensor is honest. It proves that a specific log digest was submitted by a specific authorized stakeholder at a specific point in the lifecycle. That is the provenance and tamper-evidence benefit demonstrated by this project.
