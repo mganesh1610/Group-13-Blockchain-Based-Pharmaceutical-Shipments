@@ -356,6 +356,8 @@ The `Developer sandbox` panel is designed for local grading checks. `Connect San
 
 MetaMask does not allow a web page to import a wallet automatically. After `Connect Sandbox Network`, expand `Sandbox stakeholder addresses` in the left sidebar and use `Copy test key` for the local Hardhat account you want to import. Paste that key into MetaMask using `Import account`. These keys are only the public Hardhat development keys and must never be used on a real network.
 
+MetaMask may rename imported accounts as `Imported Account 1`, `Imported Account 2`, and so on. That display name does not need to match the Hardhat account number. Verify the wallet by comparing the address: the local admin is `0xf39F...92266`, manufacturer is `0x7099...79C8`, distributor is `0x3C44...93BC`, retailer is `0x90F7...b906`, and regulator is `0x15d3...6A65`.
+
 Option B: localhost frontend with deployed Polygon Amoy contract
 
 1. Keep the frontend running at `http://localhost:5173`.
