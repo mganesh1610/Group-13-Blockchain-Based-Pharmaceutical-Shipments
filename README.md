@@ -13,16 +13,9 @@ Live deployment:
 - Polygon Amoy contract: `0xAFdcF244CAb9d632946c42A07463F3105B605EF0`
 - Amoy explorer: [View verified contract on PolygonScan](https://amoy.polygonscan.com/address/0xAFdcF244CAb9d632946c42A07463F3105B605EF0)
 
-Recommended grading path:
+Testing options:
 
-1. Open the live web app.
-2. Add Polygon Amoy Testnet to MetaMask using the network settings below.
-3. Import the grader admin wallet and stakeholder wallets provided in the private Canvas submission notes.
-4. Connect the admin wallet first and grant roles to the stakeholder public addresses listed in this README.
-5. Switch MetaMask between the manufacturer, distributor, retailer, and regulator wallets to run the role-specific workflow.
-6. Use `Batch Trace`, `Consumer Verify`, and `Tamper Check` to inspect the proof trail.
-
-The local setup instructions are included below for source-code verification and repeatable testing.
+Both live Polygon Amoy testing and local Hardhat sandbox testing are supported. The live app can be used for the deployed testnet workflow, while the local setup can be used for source-code verification and repeatable sandbox testing. Detailed instructions for both options are provided later in this README.
 
 ## Stakeholders and Permissions
 
