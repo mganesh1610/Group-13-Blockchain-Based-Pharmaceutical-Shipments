@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState, startTransition } from "react";
-import { BrowserRouter, NavLink, Route, Routes, useParams, useSearchParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams
+} from "react-router-dom";
 import { ethers } from "ethers";
 import { QRCodeSVG } from "qrcode.react";
 import { statusLabels, supplyChainAbi } from "./contractAbi";
@@ -9,10 +18,28 @@ const DEFAULT_RPC_URL = import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545";
 const DEFAULT_BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? (import.meta.env.DEV ? "http://localhost:4000" : "");
 const DEFAULT_CONTRACT_ADDRESS =
   import.meta.env.VITE_CONTRACT_ADDRESS || (import.meta.env.DEV ? "0x5FbDB2315678afecb367f032d93F642f64180aa3" : "");
+const LOCAL_SANDBOX_RPC_URL = "http://127.0.0.1:8545";
+const LOCAL_SANDBOX_CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const LOCAL_SANDBOX_CHAIN_ID = 31337n;
+const LOCAL_SANDBOX_MNEMONIC = "test test test test test test test test test test test junk";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const POLYGON_AMOY_CHAIN_ID = 80002n;
 const STATUS_OPTIONS = statusLabels
   .map((label, value) => ({ label, value }))
   .filter((status) => status.value > 0 && status.value < 6);
+const STATUS_OPTIONS_BY_ROLE = {
+  Distributor: [1, 2, 3, 5],
+  Retailer: [2, 3, 4, 5]
+};
+const VALID_STATUS_TRANSITIONS = {
+  0: [1, 3, 5],
+  1: [2, 5],
+  2: [3, 4, 5],
+  3: [1, 4, 5],
+  4: [5],
+  5: [3, 4],
+  6: []
+};
 
 const stakeholderRoleOptions = [
   { key: "admin", label: "Admin", roleHash: ethers.ZeroHash },
@@ -29,19 +56,19 @@ const navItems = [
   {
     label: "Transfer Custody",
     to: "/transfer",
-    roles: ["Admin", "Manufacturer", "Distributor", "Retailer"],
+    roles: ["Manufacturer", "Distributor"],
     sidebarLabel: "Custody Transfer"
   },
   {
     label: "Status Update",
     to: "/status",
-    roles: ["Admin", "Manufacturer", "Distributor", "Retailer"],
+    roles: ["Distributor", "Retailer"],
     sidebarLabel: "Status Update"
   },
   {
     label: "Condition Logs",
     to: "/conditions",
-    roles: ["Admin", "Distributor", "Retailer", "Regulator"],
+    roles: ["Distributor", "Retailer"],
     sidebarLabel: "Condition Logs"
   },
   { label: "Regulator Review", to: "/regulator", roles: ["Regulator"], sidebarLabel: "Regulator Review" },
@@ -51,6 +78,7 @@ const navItems = [
 ];
 
 const navByPath = Object.fromEntries(navItems.map((item) => [item.to, item]));
+const stakeholderRoleOrder = ["Manufacturer", "Distributor", "Retailer", "Regulator", "Admin"];
 
 function hasAnyRole(walletRoles, requiredRoles = []) {
   return requiredRoles.some((role) => walletRoles.includes(role));
@@ -80,6 +108,34 @@ function requiredRoleText(roles = []) {
   return roles.join(" or ");
 }
 
+function primaryStakeholderRole(roles = [], fallback = "Stakeholder") {
+  return stakeholderRoleOrder.find((role) => roles.includes(role)) || fallback;
+}
+
+function roleForAddress(roleMap, address, fallback = "Stakeholder") {
+  if (!address || !roleMap) return fallback;
+  return roleMap[ethers.getAddress(address).toLowerCase()] || fallback;
+}
+
+function statusOptionsForRoles(roles = [], currentStatus = null) {
+  const allowedValues = new Set();
+
+  roles.forEach((role) => {
+    STATUS_OPTIONS_BY_ROLE[role]?.forEach((value) => allowedValues.add(value));
+  });
+
+  const roleFilteredOptions = allowedValues.size
+    ? STATUS_OPTIONS.filter((status) => allowedValues.has(status.value))
+    : STATUS_OPTIONS;
+
+  if (currentStatus === null || currentStatus === undefined) {
+    return roleFilteredOptions;
+  }
+
+  const validNextStatuses = new Set(VALID_STATUS_TRANSITIONS[Number(currentStatus)] || []);
+  return roleFilteredOptions.filter((status) => validNextStatuses.has(status.value));
+}
+
 function shortAddress(address) {
   if (!address) return "Not set";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -96,8 +152,67 @@ function formatInputDate(value) {
   return new Date(Number(value) * 1000).toISOString().slice(0, 10);
 }
 
+function tupleValue(item, key, index, fallback = "") {
+  return item?.[key] ?? item?.[index] ?? fallback;
+}
+
+function collectErrorMessages(error, seen = new Set()) {
+  if (!error) return [];
+  if (typeof error === "string") return [error];
+  if (typeof error !== "object" || seen.has(error)) return [];
+
+  seen.add(error);
+
+  const messages = [];
+  ["shortMessage", "reason", "message"].forEach((key) => {
+    if (typeof error[key] === "string") {
+      messages.push(error[key]);
+    }
+  });
+
+  ["error", "info", "data", "payload", "cause"].forEach((key) => {
+    messages.push(...collectErrorMessages(error[key], seen));
+  });
+
+  return messages;
+}
+
 function parseError(error) {
-  const message = error?.shortMessage || error?.reason || error?.message || "Unexpected error";
+  const messages = collectErrorMessages(error);
+  const joined = messages.join(" ");
+  const message =
+    messages.find((item) => /Batch already registered|AccessControl|Only |Invalid |required|reverted/i.test(item)) ||
+    messages[0] ||
+    "Unexpected error";
+
+  if (/Batch already registered/i.test(joined)) {
+    return "This Batch ID is already registered on-chain. Use a new Batch ID, then submit again.";
+  }
+
+  if (/Invalid status transition/i.test(joined)) {
+    return "This status is not allowed from the batch's current lifecycle state. Reload the batch and choose one of the available next statuses.";
+  }
+
+  if (/unknown custom error/i.test(joined)) {
+    return "Connected wallet does not have the required smart-contract role for this transaction.";
+  }
+
+  if (/gas tip cap|priority fee|below minimum|maxPriorityFeePerGas/i.test(joined)) {
+    return "Polygon Amoy rejected the transaction fee. The app now applies Amoy-safe gas settings; retry the transaction.";
+  }
+
+  if (/could not coalesce error/i.test(joined)) {
+    return "The wallet could not submit this transaction. Check the MetaMask network and retry; on Polygon Amoy the app uses higher gas settings automatically.";
+  }
+
+  if (/could not decode result data|BAD_DATA/i.test(joined)) {
+    return "No contract was found at the configured address on the selected network. For local sandbox testing, click Connect Sandbox Network, make sure MetaMask is on Local Hardhat, and retry.";
+  }
+
+  if (/insufficient funds|insufficient balance|missing revert data/i.test(joined)) {
+    return "The connected wallet could not pay for this on-chain transaction. Add Polygon Amoy test POL to this stakeholder wallet, then retry.";
+  }
+
   return message.replace(/^execution reverted: /i, "");
 }
 
@@ -108,12 +223,30 @@ function appUrl(path) {
   return `${window.location.origin}${normalizedBase}${normalizedPath}`;
 }
 
+function filenameFromLogUri(logURI = "") {
+  const [path] = String(logURI).split("?");
+  return path.split("/").filter(Boolean).pop() || "";
+}
+
 function validateWalletAddress(address) {
   if (!ethers.isAddress(address)) {
     throw new Error("Enter a valid MetaMask wallet address.");
   }
 
   return ethers.getAddress(address);
+}
+
+function isLocalSandboxConnection({ chainId, rpcUrl, contractAddress, networkStatus }) {
+  return (
+    chainId === LOCAL_SANDBOX_CHAIN_ID ||
+    networkStatus === "Local Hardhat" ||
+    rpcUrl.replace(/\/$/, "") === LOCAL_SANDBOX_RPC_URL ||
+    contractAddress.toLowerCase() === LOCAL_SANDBOX_CONTRACT_ADDRESS.toLowerCase()
+  );
+}
+
+function localSandboxTestKey(index) {
+  return ethers.HDNodeWallet.fromPhrase(LOCAL_SANDBOX_MNEMONIC, undefined, `m/44'/60'/0'/0/${index}`).privateKey;
 }
 
 async function getStakeholderRoleHash(contract, roleKey) {
@@ -131,32 +264,56 @@ async function getStakeholderRoleHash(contract, roleKey) {
 
 function normalizeBatch(batch) {
   return {
-    batchId: batch.batchId,
-    productName: batch.productName,
-    origin: batch.origin,
-    manufactureDate: Number(batch.manufactureDate),
-    manufacturer: batch.manufacturer,
-    currentCustodian: batch.currentCustodian,
-    status: Number(batch.status),
-    exists: batch.exists,
-    recalled: batch.recalled,
-    lastStatusNote: batch.lastStatusNote
+    batchId: tupleValue(batch, "batchId", 0),
+    productName: tupleValue(batch, "productName", 1),
+    origin: tupleValue(batch, "origin", 2),
+    manufactureDate: Number(tupleValue(batch, "manufactureDate", 3, 0)),
+    manufacturer: tupleValue(batch, "manufacturer", 4),
+    currentCustodian: tupleValue(batch, "currentCustodian", 5),
+    status: Number(tupleValue(batch, "status", 6, 0)),
+    exists: Boolean(tupleValue(batch, "exists", 7, false)),
+    recalled: Boolean(tupleValue(batch, "recalled", 8, false)),
+    lastStatusNote: tupleValue(batch, "lastStatusNote", 9)
   };
 }
 
-function normalizeHistoryItem(item) {
+function normalizeCustodyRecord(item) {
   return {
-    ...item,
-    timestamp: Number(item.timestamp)
+    from: tupleValue(item, "from", 0),
+    to: tupleValue(item, "to", 1),
+    timestamp: Number(tupleValue(item, "timestamp", 2, 0)),
+    location: tupleValue(item, "location", 3),
+    notes: tupleValue(item, "notes", 4)
+  };
+}
+
+function normalizeConditionRecord(item) {
+  return {
+    logHash: tupleValue(item, "logHash", 0),
+    logURI: tupleValue(item, "logURI", 1),
+    breachFlag: Boolean(tupleValue(item, "breachFlag", 2, false)),
+    summary: tupleValue(item, "summary", 3),
+    timestamp: Number(tupleValue(item, "timestamp", 4, 0)),
+    submittedBy: tupleValue(item, "submittedBy", 5)
+  };
+}
+
+function normalizeVerificationRecord(item) {
+  return {
+    verificationType: tupleValue(item, "verificationType", 0),
+    result: Boolean(tupleValue(item, "result", 1, false)),
+    remarks: tupleValue(item, "remarks", 2),
+    timestamp: Number(tupleValue(item, "timestamp", 3, 0)),
+    verifiedBy: tupleValue(item, "verifiedBy", 4)
   };
 }
 
 function normalizeRecall(recall) {
   return {
-    isRecalled: recall.isRecalled,
-    reason: recall.reason,
-    timestamp: Number(recall.timestamp),
-    actionBy: recall.actionBy
+    isRecalled: Boolean(tupleValue(recall, "isRecalled", 0, false)),
+    reason: tupleValue(recall, "reason", 1),
+    timestamp: Number(tupleValue(recall, "timestamp", 2, 0)),
+    actionBy: tupleValue(recall, "actionBy", 3)
   };
 }
 
@@ -175,13 +332,51 @@ async function loadBatchTrace(contract, batchId) {
     contract.getVerificationHistory(batchId),
     contract.getRecallInfo(batchId)
   ]);
+  const normalizedBatch = normalizeBatch(batch);
+  const normalizedCustody = custody.map(normalizeCustodyRecord);
+  const normalizedConditions = conditions.map(normalizeConditionRecord);
+  const normalizedVerifications = verifications.map(normalizeVerificationRecord);
+  const normalizedRecall = normalizeRecall(recall);
+  const knownAddresses = [
+    normalizedBatch.manufacturer,
+    normalizedBatch.currentCustodian,
+    ...normalizedCustody.flatMap((record) => [record.from, record.to]),
+    ...normalizedConditions.map((record) => record.submittedBy),
+    ...normalizedVerifications.map((record) => record.verifiedBy),
+    normalizedRecall.actionBy
+  ].filter((address) => ethers.isAddress(address) && address !== ZERO_ADDRESS);
+  const uniqueAddresses = Array.from(new Set(knownAddresses.map((address) => ethers.getAddress(address).toLowerCase())));
+  const roleEntries = await Promise.all(
+    uniqueAddresses.map(async (address) => {
+      const roles = await detectWalletRoles(contract, address).catch(() => []);
+      return [address, primaryStakeholderRole(roles)];
+    })
+  );
+  const roleMap = Object.fromEntries(roleEntries);
 
   return {
-    batch: normalizeBatch(batch),
-    custody: custody.map(normalizeHistoryItem),
-    conditions: conditions.map(normalizeHistoryItem),
-    verifications: verifications.map(normalizeHistoryItem),
-    recall: normalizeRecall(recall)
+    batch: {
+      ...normalizedBatch,
+      manufacturerRole: roleForAddress(roleMap, normalizedBatch.manufacturer, "Manufacturer"),
+      currentCustodianRole: roleForAddress(roleMap, normalizedBatch.currentCustodian)
+    },
+    custody: normalizedCustody.map((record) => ({
+      ...record,
+      fromRole: roleForAddress(roleMap, record.from),
+      toRole: roleForAddress(roleMap, record.to)
+    })),
+    conditions: normalizedConditions.map((record) => ({
+      ...record,
+      submittedByRole: roleForAddress(roleMap, record.submittedBy)
+    })),
+    verifications: normalizedVerifications.map((record) => ({
+      ...record,
+      verifiedByRole: roleForAddress(roleMap, record.verifiedBy)
+    })),
+    recall: {
+      ...normalizedRecall,
+      actionByRole: roleForAddress(roleMap, normalizedRecall.actionBy, "Regulator")
+    }
   };
 }
 
@@ -267,11 +462,14 @@ function Field({ label, children }) {
   );
 }
 
-function AddressLine({ label, address, onCopy }) {
+function AddressLine({ label, address, onCopy, roleLabel }) {
   return (
     <div className="address-line">
       <span>{label}</span>
-      <code title={address}>{address || "Not set"}</code>
+      <div className="address-value">
+        {roleLabel ? <strong>{roleLabel}</strong> : null}
+        <code title={address}>{address || "Not set"}</code>
+      </div>
       {address ? (
         <button type="button" className="ghost small" onClick={() => onCopy(address, label)}>
           Copy
@@ -351,8 +549,18 @@ function TraceView({ trace, onCopy }) {
         </div>
 
         <div className="address-grid">
-          <AddressLine label="Manufacturer" address={batch.manufacturer} onCopy={onCopy} />
-          <AddressLine label="Current custodian" address={batch.currentCustodian} onCopy={onCopy} />
+          <AddressLine
+            label="Manufacturer"
+            address={batch.manufacturer}
+            roleLabel={batch.manufacturerRole}
+            onCopy={onCopy}
+          />
+          <AddressLine
+            label="Current custodian"
+            address={batch.currentCustodian}
+            roleLabel={batch.currentCustodianRole}
+            onCopy={onCopy}
+          />
         </div>
       </section>
 
@@ -437,20 +645,139 @@ function TraceView({ trace, onCopy }) {
   );
 }
 
+function ConsumerSummary({ trace }) {
+  if (!trace) {
+    return <p className="muted">Enter a batch ID or scan a QR code from the batch trace page.</p>;
+  }
+
+  if (trace.notFound) {
+    return (
+      <div className="warning-panel">
+        <strong>Unregistered batch</strong>
+        <p>This batch ID was not found on the deployed contract. Do not treat it as an authenticated shipment.</p>
+      </div>
+    );
+  }
+
+  const { batch, custody, conditions, verifications, recall } = trace;
+  const hasBreach = Number(batch.status) === 5 || conditions.some((record) => record.breachFlag);
+  const isRecalled = batch.recalled || Number(batch.status) === 6 || recall?.isRecalled;
+  const latestCondition = conditions[conditions.length - 1];
+  const latestVerification = verifications[verifications.length - 1];
+  const custodyRoles = [
+    batch.manufacturerRole,
+    ...custody.map((record) => record.toRole),
+    custody.length ? null : batch.currentCustodianRole
+  ].filter(Boolean);
+  const uniqueCustodyRoles = [...new Set(custodyRoles)];
+  const resultClass = isRecalled ? "danger" : hasBreach ? "warning" : "success";
+  const resultTitle = isRecalled
+    ? "Do not use: regulator recall recorded"
+    : hasBreach
+      ? "Use caution: cold-chain exception found"
+      : "Authentic batch record found";
+  const resultText = isRecalled
+    ? recall.reason || batch.lastStatusNote || "This batch has a recall record on-chain."
+    : hasBreach
+      ? latestCondition?.summary || batch.lastStatusNote || "A condition breach was recorded for this batch."
+      : "This batch is registered on-chain and no recall is recorded.";
+
+  return (
+    <div className="consumer-summary">
+      <section className={`consumer-verdict ${resultClass}`}>
+        <div>
+          <p className="eyebrow">Verification Result</p>
+          <h3>{resultTitle}</h3>
+          <p>{resultText}</p>
+        </div>
+        <StatusBadge status={batch.status} recalled={batch.recalled} />
+      </section>
+
+      <div className="consumer-card-grid">
+        <article>
+          <span>Product</span>
+          <strong>{batch.productName}</strong>
+          <p>Batch ID: {batch.batchId}</p>
+        </article>
+        <article>
+          <span>Current holder</span>
+          <strong>{batch.currentCustodianRole}</strong>
+          <p>{statusLabels[batch.status]} at this point in the lifecycle.</p>
+        </article>
+        <article>
+          <span>Cold-chain evidence</span>
+          <strong>{conditions.length} log proof(s)</strong>
+          <p>{latestCondition?.summary || "No condition log has been anchored yet."}</p>
+        </article>
+        <article>
+          <span>Regulator review</span>
+          <strong>{latestVerification ? latestVerification.verificationType : "Pending"}</strong>
+          <p>
+            {latestVerification
+              ? `${latestVerification.result ? "Approved" : "Issue found"} by ${latestVerification.verifiedByRole}.`
+              : "No regulator verification has been added yet."}
+          </p>
+        </article>
+      </div>
+
+      <section className="consumer-chain">
+        <p className="eyebrow">Supply Chain Path</p>
+        <div className="consumer-chain-steps">
+          {uniqueCustodyRoles.map((role, index) => (
+            <React.Fragment key={`${role}-${index}`}>
+              <span>{role}</span>
+              {index < uniqueCustodyRoles.length - 1 ? <b aria-hidden="true">→</b> : null}
+            </React.Fragment>
+          ))}
+        </div>
+        <p className="muted">
+          Public verification summarizes the provenance trail. Full wallet-level custody and condition records remain in
+          Batch Trace for audit review.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 function Layout({ app, children }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const visibleNavItems = navItems.filter((item) => canAccessNavItem(item, app.walletRoles));
   const visibleWorkspaceItems = visibleNavItems.filter((item) => item.sidebarLabel && item.to !== "/");
+  const showSandboxTools = !app.walletAddress || app.walletRoles.includes("Admin");
+
+  useEffect(() => {
+    app.setNotice(null);
+  }, [location.pathname, location.search]);
+
+  async function refreshActiveTrace() {
+    const batchId = app.activeBatchId.trim();
+    if (!batchId) {
+      app.setNotice({ type: "warning", message: "Enter a Batch ID before refreshing the trace." });
+      return;
+    }
+
+    const trace = await app.refreshBatch(batchId);
+    navigate("/trace");
+    window.setTimeout(() => {
+      app.setNotice(
+        trace?.notFound
+          ? { type: "warning", message: `Batch ${batchId} is not registered on-chain yet.` }
+          : { type: "success", message: `Loaded blockchain trace for ${batchId}.` }
+      );
+    }, 0);
+  }
 
   return (
     <div className="app-shell">
       <aside className="side-rail" aria-label="Control sidebar">
-        <div className="brand-mark">
+        <NavLink className="brand-mark" to="/" aria-label="Open dashboard">
           <span>CC</span>
           <div>
             <strong>ColdChain</strong>
             <small>Provenance</small>
           </div>
-        </div>
+        </NavLink>
 
         <div className="rail-section stakeholder-session">
           <p className="eyebrow">Stakeholder Access</p>
@@ -480,7 +807,7 @@ function Layout({ app, children }) {
           <Field label="Batch ID">
             <input value={app.activeBatchId} onChange={(event) => app.setActiveBatchId(event.target.value)} />
           </Field>
-          <button type="button" onClick={() => app.refreshBatch(app.activeBatchId)}>
+          <button type="button" onClick={refreshActiveTrace}>
             Refresh Trace
           </button>
         </div>
@@ -494,33 +821,35 @@ function Layout({ app, children }) {
           ))}
         </div>
 
-        <details className="rail-section compact sandbox-tools">
-          <summary>Developer sandbox</summary>
-          <p className="rail-note">
-            Local Hardhat shortcuts only. Production stakeholders use their own organization wallets.
-          </p>
-          <button type="button" className="secondary" onClick={app.connectLocalNetwork}>
-            Connect Sandbox Network
-          </button>
-          <button type="button" className="secondary" onClick={app.grantDemoRoles}>
-            Assign Sandbox Roles
-          </button>
-          <button type="button" onClick={app.demoRegisterBatch}>
-            Run Manufacturer Step
-          </button>
-          <button type="button" onClick={app.demoSendToDistributor}>
-            Run Distributor Step
-          </button>
-          <button type="button" onClick={app.demoDeliverAndVerify}>
-            Run Retailer + Regulator Step
-          </button>
-          <button type="button" className="danger-soft" onClick={app.demoBreachAndRecall}>
-            Run Breach + Recall Scenario
-          </button>
-          <button type="button" className="ghost" onClick={app.demoUnauthorizedAction}>
-            Run Unauthorized Action Check
-          </button>
-        </details>
+        {showSandboxTools ? (
+          <details className="rail-section compact sandbox-tools">
+            <summary>Developer sandbox</summary>
+            <p className="rail-note">
+              Local Hardhat shortcuts only. Production stakeholders use their own organization wallets.
+            </p>
+            <button type="button" className="secondary" onClick={app.connectLocalNetwork}>
+              Connect Sandbox Network
+            </button>
+            <button type="button" className="secondary" onClick={app.grantDemoRoles}>
+              Assign Sandbox Roles
+            </button>
+            <button type="button" onClick={app.demoRegisterBatch}>
+              Run Manufacturer Step
+            </button>
+            <button type="button" onClick={app.demoSendToDistributor}>
+              Run Distributor Step
+            </button>
+            <button type="button" onClick={app.demoDeliverAndVerify}>
+              Run Retailer + Regulator Step
+            </button>
+            <button type="button" className="danger-soft" onClick={app.demoBreachAndRecall}>
+              Run Breach + Recall Scenario
+            </button>
+            <button type="button" className="ghost" onClick={app.demoUnauthorizedAction}>
+              Run Unauthorized Action Check
+            </button>
+          </details>
+        ) : null}
 
         <details className="rail-section compact">
           <summary>Edit connection details</summary>
@@ -537,14 +866,35 @@ function Layout({ app, children }) {
 
         <details className="rail-section wallet-list compact">
           <summary>Sandbox stakeholder addresses</summary>
+          {app.networkStatus === "Local Hardhat" ? (
+            <p className="rail-note">
+              MetaMask does not allow websites to import accounts automatically. Copy a local test key, then import it
+              manually in MetaMask.
+            </p>
+          ) : null}
           <p className="eyebrow">Sandbox Accounts</p>
           {app.stakeholders.map((stakeholder) => (
             <div className="wallet-row" key={stakeholder.role}>
               <strong>{stakeholder.role}</strong>
               <code>{shortAddress(stakeholder.address)}</code>
-              <button type="button" className="ghost small" onClick={() => app.copyText(stakeholder.address, stakeholder.role)}>
-                Copy
-              </button>
+              <div className="wallet-actions">
+                <button
+                  type="button"
+                  className="ghost small"
+                  onClick={() => app.copyText(stakeholder.address, `${stakeholder.role} address`)}
+                >
+                  Copy address
+                </button>
+                {app.networkStatus === "Local Hardhat" && stakeholder.privateKey ? (
+                  <button
+                    type="button"
+                    className="ghost small"
+                    onClick={() => app.copyText(stakeholder.privateKey, `${stakeholder.role} private key`)}
+                  >
+                    Copy test key
+                  </button>
+                ) : null}
+              </div>
             </div>
           ))}
         </details>
@@ -714,9 +1064,9 @@ function AdminAccessPage({ app }) {
   async function grantAccess() {
     try {
       const wallet = validateWalletAddress(form.walletAddress);
-      await app.runWalletWrite(`Grant ${selectedRole.label} access`, async (contract) => {
+      await app.runWalletWrite(`Grant ${selectedRole.label} access`, async (contract, overrides) => {
         const roleHash = await getStakeholderRoleHash(contract, form.role);
-        const tx = await contract.grantRole(roleHash, wallet);
+        const tx = await contract.grantRole(roleHash, wallet, overrides);
         await tx.wait();
         const hasAccess = await contract.hasRole(roleHash, wallet);
         setRoleStatus({ wallet, role: selectedRole.label, hasAccess });
@@ -730,9 +1080,9 @@ function AdminAccessPage({ app }) {
   async function removeAccess() {
     try {
       const wallet = validateWalletAddress(form.walletAddress);
-      await app.runWalletWrite(`Remove ${selectedRole.label} access`, async (contract) => {
+      await app.runWalletWrite(`Remove ${selectedRole.label} access`, async (contract, overrides) => {
         const roleHash = await getStakeholderRoleHash(contract, form.role);
-        const tx = await contract.revokeRole(roleHash, wallet);
+        const tx = await contract.revokeRole(roleHash, wallet, overrides);
         await tx.wait();
         const hasAccess = await contract.hasRole(roleHash, wallet);
         setRoleStatus({ wallet, role: selectedRole.label, hasAccess });
@@ -835,12 +1185,22 @@ function RegisterPage({ app }) {
 
   async function submit(event) {
     event.preventDefault();
-    await app.runWalletWrite("Manufacturer register batch", async (contract) => {
+    await app.runWalletWrite("Manufacturer register batch", async (contract, overrides) => {
+      const batchId = form.batchId.trim();
+      if (!batchId) {
+        throw new Error("Batch ID is required.");
+      }
+
+      const alreadyRegistered = await contract.batchExists(batchId);
+      if (alreadyRegistered) {
+        throw new Error(`Batch ${batchId} is already registered. Use a new Batch ID such as BATCH${Date.now().toString().slice(-6)}.`);
+      }
+
       const timestamp = Math.floor(new Date(form.manufactureDate).getTime() / 1000);
-      const tx = await contract.registerBatch(form.batchId, form.productName, form.origin, timestamp);
+      const tx = await contract.registerBatch(batchId, form.productName.trim(), form.origin.trim(), timestamp, overrides);
       await tx.wait();
-      app.setActiveBatchId(form.batchId);
-      await app.refreshBatch(form.batchId);
+      app.setActiveBatchId(batchId);
+      await app.refreshBatch(batchId);
       await app.refreshDashboard();
     });
   }
@@ -882,8 +1242,8 @@ function TransferPage({ app }) {
 
   async function submit(event) {
     event.preventDefault();
-    await app.runWalletWrite("Custody transfer", async (contract) => {
-      const tx = await contract.transferCustody(form.batchId, form.to, form.location, form.notes);
+    await app.runWalletWrite("Custody transfer", async (contract, overrides) => {
+      const tx = await contract.transferCustody(form.batchId, form.to, form.location, form.notes, overrides);
       await tx.wait();
       await app.refreshBatch(form.batchId);
       await app.refreshDashboard();
@@ -911,17 +1271,70 @@ function TransferPage({ app }) {
 
 function StatusPage({ app }) {
   const [form, setForm] = useState({ batchId: app.activeBatchId, status: "1", notes: "Shipment in transit" });
+  const [currentStatus, setCurrentStatus] = useState(null);
+  const availableStatusOptions = useMemo(
+    () => statusOptionsForRoles(app.walletRoles, currentStatus),
+    [app.walletRoles, currentStatus]
+  );
 
   useEffect(() => {
     setForm((current) => ({ ...current, batchId: app.activeBatchId }));
   }, [app.activeBatchId]);
 
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadCurrentStatus() {
+      const batchId = form.batchId.trim();
+      if (!app.readContract || !batchId) {
+        setCurrentStatus(null);
+        return;
+      }
+
+      try {
+        const exists = await app.readContract.batchExists(batchId);
+        if (!isCurrent) return;
+
+        if (!exists) {
+          setCurrentStatus(null);
+          return;
+        }
+
+        const batch = normalizeBatch(await app.readContract.getBatch(batchId));
+        if (isCurrent) {
+          setCurrentStatus(batch.status);
+        }
+      } catch {
+        if (isCurrent) {
+          setCurrentStatus(null);
+        }
+      }
+    }
+
+    loadCurrentStatus();
+    return () => {
+      isCurrent = false;
+    };
+  }, [app.readContract, app.currentTrace?.batch?.status, form.batchId]);
+
+  useEffect(() => {
+    if (availableStatusOptions.length && !availableStatusOptions.some((status) => String(status.value) === form.status)) {
+      setForm((current) => ({
+        ...current,
+        status: String(availableStatusOptions[0]?.value || 1)
+      }));
+    }
+  }, [availableStatusOptions, form.status]);
+
   async function submit(event) {
     event.preventDefault();
-    await app.runWalletWrite("Status update", async (contract) => {
-      const tx = await contract.updateStatus(form.batchId, Number(form.status), form.notes);
+    await app.runWalletWrite("Status update", async (contract, overrides) => {
+      const tx = await contract.updateStatus(form.batchId, Number(form.status), form.notes, overrides);
       await tx.wait();
-      await app.refreshBatch(form.batchId);
+      const trace = await app.refreshBatch(form.batchId);
+      if (trace && !trace.notFound) {
+        setCurrentStatus(trace.batch.status);
+      }
       await app.refreshDashboard();
     });
   }
@@ -932,18 +1345,27 @@ function StatusPage({ app }) {
         <input value={form.batchId} onChange={(event) => setForm({ ...form, batchId: event.target.value })} />
       </Field>
       <Field label="New Status">
-        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-          {STATUS_OPTIONS.map((status) => (
+        <select
+          value={form.status}
+          onChange={(event) => setForm({ ...form, status: event.target.value })}
+          disabled={!availableStatusOptions.length}
+        >
+          {availableStatusOptions.map((status) => (
             <option key={status.value} value={status.value}>
               {status.label}
             </option>
           ))}
         </select>
       </Field>
+      <p className="muted">
+        Current status: {currentStatus === null ? "Load or enter a registered batch ID" : statusLabels[currentStatus]}.
+      </p>
       <Field label="Notes">
         <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </Field>
-      <button type="submit">Submit updateStatus()</button>
+      <button type="submit" disabled={!availableStatusOptions.length}>
+        Submit updateStatus()
+      </button>
     </FormCard>
   );
 }
@@ -998,13 +1420,14 @@ function ConditionsPage({ app }) {
       return;
     }
 
-    await app.runWalletWrite("Anchor IoT condition log", async (contract) => {
+    await app.runWalletWrite("Anchor IoT condition log", async (contract, overrides) => {
       const tx = await contract.recordCondition(
         batchId,
         logResult.logHash,
         logResult.logURI,
         logResult.breachFlag,
-        logResult.summary
+        logResult.summary,
+        overrides
       );
       await tx.wait();
       await app.refreshBatch(batchId);
@@ -1081,12 +1504,13 @@ function RegulatorPage({ app }) {
 
   async function verify(event) {
     event.preventDefault();
-    await app.runWalletWrite("Regulator verification", async (contract) => {
+    await app.runWalletWrite("Regulator verification", async (contract, overrides) => {
       const tx = await contract.addVerification(
         form.batchId,
         form.verificationType,
         form.result === "true",
-        form.remarks
+        form.remarks,
+        overrides
       );
       await tx.wait();
       await app.refreshBatch(form.batchId);
@@ -1094,8 +1518,8 @@ function RegulatorPage({ app }) {
   }
 
   async function recall() {
-    await app.runWalletWrite("Regulator recall", async (contract) => {
-      const tx = await contract.recallBatch(form.batchId, recallReason);
+    await app.runWalletWrite("Regulator recall", async (contract, overrides) => {
+      const tx = await contract.recallBatch(form.batchId, recallReason, overrides);
       await tx.wait();
       await app.refreshBatch(form.batchId);
       await app.refreshDashboard();
@@ -1192,17 +1616,16 @@ function ConsumerVerifyPage({ app }) {
     }
   }
 
-  const registered = trace && !trace.notFound;
-
   return (
     <section className="page-card wide consumer-page">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Public Read-only Verification</p>
           <h2>Consumer Batch Check</h2>
-          <p className="muted">This page reads from the blockchain and does not require MetaMask.</p>
+          <p className="muted">
+            A simplified public view for patients, buyers, or receiving staff. This page does not require MetaMask.
+          </p>
         </div>
-        {registered ? <StatusBadge status={trace.batch.status} recalled={trace.batch.recalled} /> : null}
       </div>
 
       <form className="search-row" onSubmit={verify}>
@@ -1210,53 +1633,104 @@ function ConsumerVerifyPage({ app }) {
         <button type="submit">Verify Batch</button>
       </form>
 
-      {registered ? (
-        <div className="plain-result">
-          <h3>{trace.batch.recalled ? "Do not use: batch recalled" : "Registered batch found"}</h3>
-          <p>
-            {trace.batch.batchId} is registered on the provenance contract. Current status is{" "}
-            <strong>{statusLabels[trace.batch.status]}</strong>, and the custody trail contains{" "}
-            <strong>{trace.custody.length}</strong> transfer record(s).
-          </p>
-          <TraceView trace={trace} onCopy={app.copyText} />
-        </div>
-      ) : trace?.notFound ? (
-        <div className="warning-panel">
-          <strong>Unregistered batch</strong>
-          <p>This batch ID was not found on the deployed contract.</p>
-        </div>
-      ) : (
-        <p className="muted">Enter a batch ID or scan a QR code from the batch trace page.</p>
-      )}
+      <ConsumerSummary trace={trace} />
     </section>
   );
 }
 
 function TamperCheckPage({ app }) {
+  const [batchId, setBatchId] = useState(app.activeBatchId);
   const [filename, setFilename] = useState("");
   const [expectedHash, setExpectedHash] = useState("");
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
+  const [loadedProof, setLoadedProof] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    setBatchId(app.activeBatchId);
+  }, [app.activeBatchId]);
+
+  async function populateFromBatch() {
+    const cleanedBatchId = batchId.trim();
+    if (!cleanedBatchId) {
+      throw new Error("Enter a Batch ID first.");
+    }
+
+    if (!app.readContract) {
+      throw new Error("Blockchain read contract is not ready yet.");
+    }
+
+    const trace = await loadBatchTrace(app.readContract, cleanedBatchId);
+    if (trace?.notFound) {
+      throw new Error(`Batch ${cleanedBatchId} is not registered.`);
+    }
+
+    const latestCondition = trace.conditions.at(-1);
+    if (!latestCondition) {
+      throw new Error(`Batch ${cleanedBatchId} does not have any anchored condition logs yet.`);
+    }
+
+    const storedFilename = filenameFromLogUri(latestCondition.logURI);
+    setExpectedHash(latestCondition.logHash);
+    setFilename(storedFilename);
+    setLoadedProof(latestCondition);
+    setResult(null);
+    app.setNotice({ type: "success", message: `Loaded latest condition proof for ${cleanedBatchId}.` });
+    return { ...latestCondition, storedFilename };
+  }
+
+  async function loadProofFromBatch() {
+    try {
+      await populateFromBatch();
+    } catch (error) {
+      app.setNotice({ type: "error", message: parseError(error) });
+    }
+  }
 
   async function verify(event) {
     event.preventDefault();
     const options = { method: "POST" };
-
-    if (file) {
-      const formData = new FormData();
-      formData.append("expectedHash", expectedHash);
-      formData.append("file", file);
-      options.body = formData;
-    } else {
-      options.headers = { "Content-Type": "application/json" };
-      options.body = JSON.stringify({ filename, expectedHash });
-    }
+    setIsVerifying(true);
+    setResult(null);
+    app.setNotice({ type: "info", message: "Checking off-chain log hash against the anchored digest..." });
 
     try {
+      let hashToCheck = expectedHash.trim();
+      let filenameToCheck = filename.trim();
+
+      if (!hashToCheck || (!file && !filenameToCheck)) {
+        const proof = await populateFromBatch();
+        hashToCheck = proof.logHash;
+        filenameToCheck = proof.storedFilename;
+      }
+
+      if (file) {
+        const formData = new FormData();
+        formData.append("expectedHash", hashToCheck);
+        formData.append("file", file);
+        options.body = formData;
+      } else {
+        options.headers = { "Content-Type": "application/json" };
+        options.body = JSON.stringify({ filename: filenameToCheck, expectedHash: hashToCheck });
+      }
+
       const response = await app.callBackend("/api/logs/verify", options);
       setResult(response);
+      app.setNotice({
+        type: response.isMatch ? "success" : "warning",
+        message: response.message || (response.isMatch ? "MATCH: off-chain file is authentic." : "MISMATCH: file was changed.")
+      });
     } catch (error) {
-      app.setNotice({ type: "error", message: parseError(error) });
+      const message = parseError(error);
+      setResult({
+        error: true,
+        isMatch: false,
+        message
+      });
+      app.setNotice({ type: "error", message });
+    } finally {
+      setIsVerifying(false);
     }
   }
 
@@ -1265,6 +1739,21 @@ function TamperCheckPage({ app }) {
       <form className="page-card" onSubmit={verify}>
         <p className="eyebrow">Tamper Evidence</p>
         <h2>Verify Off-chain Log Hash</h2>
+        <p className="muted">
+          Enter a Batch ID to load the latest anchored condition proof, or paste the hash and filename manually.
+        </p>
+        <Field label="Batch ID">
+          <input value={batchId} onChange={(event) => setBatchId(event.target.value)} placeholder="BATCH001" />
+        </Field>
+        <button type="button" className="secondary" onClick={loadProofFromBatch}>
+          Load Latest Condition Proof
+        </button>
+        {loadedProof ? (
+          <div className={`plain-result ${loadedProof.breachFlag ? "warning" : ""}`}>
+            <strong>{loadedProof.breachFlag ? "Breach proof loaded" : "Condition proof loaded"}</strong>
+            <p>{loadedProof.summary}</p>
+          </div>
+        ) : null}
         <Field label="Expected On-chain Hash">
           <input value={expectedHash} onChange={(event) => setExpectedHash(event.target.value)} />
         </Field>
@@ -1275,17 +1764,24 @@ function TamperCheckPage({ app }) {
           Or choose modified/original file
           <input type="file" onChange={(event) => setFile(event.target.files[0])} />
         </label>
-        <button type="submit">Run Hash Verification</button>
+        <button type="submit" disabled={isVerifying}>
+          {isVerifying ? "Checking Hash..." : "Run Hash Verification"}
+        </button>
       </form>
 
       <div className="page-card">
         <h2>Verification Result</h2>
-        {result ? (
+        {isVerifying ? (
+          <div className="plain-result">
+            <strong>Checking hash...</strong>
+            <p>Reading the off-chain log and recomputing the digest.</p>
+          </div>
+        ) : result ? (
           <div className={result.isMatch ? "match-result" : "mismatch-result"}>
-            <strong>{result.isMatch ? "MATCH" : "MISMATCH"}</strong>
+            <strong>{result.error ? "Verification request failed" : result.isMatch ? "MATCH" : "MISMATCH"}</strong>
             <p>{result.message}</p>
-            <code className="breakable">Expected: {result.expectedHash}</code>
-            <code className="breakable">Recomputed: {result.recomputedHash}</code>
+            {result.expectedHash ? <code className="breakable">Expected: {result.expectedHash}</code> : null}
+            {result.recomputedHash ? <code className="breakable">Recomputed: {result.recomputedHash}</code> : null}
           </div>
         ) : (
           <p className="muted">Run a check to compare a file against the anchored digest.</p>
@@ -1351,12 +1847,12 @@ function ColdChainApp() {
   const [batches, setBatches] = useState([]);
   const [activity, setActivity] = useState([]);
   const [stakeholders, setStakeholders] = useState([
-    { role: "Admin", address: "" },
-    { role: "Manufacturer", address: "" },
-    { role: "Distributor", address: "" },
-    { role: "Retailer", address: "" },
-    { role: "Regulator", address: "" },
-    { role: "Consumer", address: "" }
+    { role: "Admin", address: "", privateKey: "" },
+    { role: "Manufacturer", address: "", privateKey: "" },
+    { role: "Distributor", address: "", privateKey: "" },
+    { role: "Retailer", address: "", privateKey: "" },
+    { role: "Regulator", address: "", privateKey: "" },
+    { role: "Consumer", address: "", privateKey: "" }
   ]);
 
   useEffect(() => {
@@ -1412,9 +1908,12 @@ function ColdChainApp() {
 
   async function callBackend(path, options) {
     const response = await fetch(`${backendUrl}${path}`, options);
-    const payload = await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json")
+      ? await response.json()
+      : { message: await response.text() };
     if (!response.ok) {
-      throw new Error(payload.message || "Backend request failed");
+      throw new Error(payload.message || `Backend request failed with status ${response.status}`);
     }
     return payload;
   }
@@ -1468,10 +1967,39 @@ function ColdChainApp() {
         }
       }
 
+      const network = await browserProvider.getNetwork();
+      let activeContractAddress = contractAddress;
+      const useLocalSandbox = isLocalSandboxConnection({
+        chainId: network.chainId,
+        rpcUrl,
+        contractAddress,
+        networkStatus
+      });
+
+      if (useLocalSandbox) {
+        const sandbox = await loadLocalSandboxConnection();
+        activeContractAddress = sandbox.sandboxContractAddress;
+      }
+
+      if (!ethers.isAddress(activeContractAddress)) {
+        throw new Error("Set a valid contract address before connecting a stakeholder wallet.");
+      }
+
+      const roleProvider = useLocalSandbox ? new ethers.JsonRpcProvider(LOCAL_SANDBOX_RPC_URL) : browserProvider;
+      const deployedCode = await roleProvider.getCode(activeContractAddress);
+      if (deployedCode === "0x") {
+        throw new Error(
+          useLocalSandbox
+            ? `No local sandbox contract found at ${activeContractAddress}. Run npm run deploy:local, then click Connect Sandbox Network.`
+            : `No deployed contract found at ${activeContractAddress} on the selected MetaMask network.`
+        );
+      }
+
       const signer = await browserProvider.getSigner();
       const address = await signer.getAddress();
-      const contract = new ethers.Contract(contractAddress, supplyChainAbi, signer);
-      const roles = await detectWalletRoles(contract, address);
+      const contract = new ethers.Contract(activeContractAddress, supplyChainAbi, signer);
+      const roleContract = new ethers.Contract(activeContractAddress, supplyChainAbi, roleProvider);
+      const roles = await detectWalletRoles(roleContract, address);
       setWalletAddress(address);
       setWalletRoles(roles);
       setSignerContract(contract);
@@ -1527,21 +2055,59 @@ function ColdChainApp() {
     return roles;
   }
 
-  async function getLocalActors() {
-    if (!ethers.isAddress(contractAddress)) {
-      throw new Error("Set a valid contract address first.");
+  async function getWriteOverrides(contract = signerContract) {
+    const provider = contract?.runner?.provider;
+    if (!provider?.getNetwork) return {};
+
+    const network = await provider.getNetwork();
+    if (network.chainId !== POLYGON_AMOY_CHAIN_ID) {
+      return {};
     }
 
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    return {
+      maxPriorityFeePerGas: ethers.parseUnits("35", "gwei"),
+      maxFeePerGas: ethers.parseUnits("60", "gwei")
+    };
+  }
+
+  async function requireGasBalance(contract = signerContract) {
+    const provider = contract?.runner?.provider;
+    if (!provider?.getNetwork || !walletAddress) return;
+
+    const network = await provider.getNetwork();
+    if (network.chainId !== POLYGON_AMOY_CHAIN_ID) return;
+
+    const balance = await provider.getBalance(walletAddress);
+    if (balance === 0n) {
+      throw new Error("This stakeholder wallet has 0 POL on Polygon Amoy. Add test POL before submitting an on-chain transaction.");
+    }
+  }
+
+  async function loadLocalSandboxConnection() {
+    const response = await fetch(`/demo-contract.json?cache=${Date.now()}`).catch(() => null);
+    const deployment = response?.ok ? await response.json() : null;
+    const sandboxContractAddress = deployment?.contractAddress || LOCAL_SANDBOX_CONTRACT_ADDRESS;
+
+    setRpcUrl(LOCAL_SANDBOX_RPC_URL);
+    setContractAddress(sandboxContractAddress);
+
+    return {
+      sandboxRpcUrl: LOCAL_SANDBOX_RPC_URL,
+      sandboxContractAddress
+    };
+  }
+
+  async function getLocalActors(localRpcUrl = rpcUrl) {
+    const provider = new ethers.JsonRpcProvider(localRpcUrl);
     const signers = await Promise.all([0, 1, 2, 3, 4, 5].map((index) => provider.getSigner(index)));
     const addresses = await Promise.all(signers.map((signer) => signer.getAddress()));
     setStakeholders([
-      { role: "Admin", address: addresses[0] },
-      { role: "Manufacturer", address: addresses[1] },
-      { role: "Distributor", address: addresses[2] },
-      { role: "Retailer", address: addresses[3] },
-      { role: "Regulator", address: addresses[4] },
-      { role: "Consumer", address: addresses[5] }
+      { role: "Admin", address: addresses[0], privateKey: localSandboxTestKey(0) },
+      { role: "Manufacturer", address: addresses[1], privateKey: localSandboxTestKey(1) },
+      { role: "Distributor", address: addresses[2], privateKey: localSandboxTestKey(2) },
+      { role: "Retailer", address: addresses[3], privateKey: localSandboxTestKey(3) },
+      { role: "Regulator", address: addresses[4], privateKey: localSandboxTestKey(4) },
+      { role: "Consumer", address: addresses[5], privateKey: localSandboxTestKey(5) }
     ]);
 
     return {
@@ -1562,11 +2128,20 @@ function ColdChainApp() {
 
   async function connectLocalNetwork() {
     try {
-      const actors = await getLocalActors();
+      const { sandboxRpcUrl, sandboxContractAddress } = await loadLocalSandboxConnection();
+      const actors = await getLocalActors(sandboxRpcUrl);
       await actors.provider.getBlockNumber();
+      const code = await actors.provider.getCode(sandboxContractAddress);
+      if (code === "0x") {
+        throw new Error(`No local contract found at ${sandboxContractAddress}. Run npm run deploy:local after npm run node.`);
+      }
+      setReadContract(new ethers.Contract(sandboxContractAddress, supplyChainAbi, actors.provider));
       setNetworkStatus("Local Hardhat");
-      setNotice({ type: "success", message: "Connected to local Hardhat RPC." });
-      addActivity(`Connected to local RPC at ${rpcUrl}.`);
+      setNotice({
+        type: "success",
+        message: `Connected to local Hardhat RPC and contract ${shortAddress(sandboxContractAddress)}.`
+      });
+      addActivity(`Connected to local RPC at ${sandboxRpcUrl}.`);
     } catch (error) {
       setNotice({ type: "error", message: parseError(error) });
     }
@@ -1574,8 +2149,9 @@ function ColdChainApp() {
 
   async function grantDemoRoles() {
     try {
-      const actors = await getLocalActors();
-      const contract = contractFor(actors.admin);
+      const { sandboxRpcUrl, sandboxContractAddress } = await loadLocalSandboxConnection();
+      const actors = await getLocalActors(sandboxRpcUrl);
+      const contract = new ethers.Contract(sandboxContractAddress, supplyChainAbi, actors.admin);
       const [manufacturerRole, distributorRole, retailerRole, regulatorRole] = await Promise.all([
         contract.MANUFACTURER_ROLE(),
         contract.DISTRIBUTOR_ROLE(),
@@ -1775,7 +2351,9 @@ function ColdChainApp() {
       if (!signerContract) {
         throw new Error("Connect MetaMask first with the stakeholder wallet assigned to this role.");
       }
-      await action(signerContract);
+      await requireGasBalance(signerContract);
+      const overrides = await getWriteOverrides(signerContract);
+      await action(signerContract, overrides);
       setNotice({ type: "success", message: `${label} completed.` });
       addActivity(`${label} completed from connected wallet.`);
     } catch (error) {

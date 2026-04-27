@@ -2,15 +2,18 @@ require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-gas-reporter");
 require("dotenv").config();
 
-const { AMOY_RPC_URL, PRIVATE_KEY } = process.env;
+const { AMOY_RPC_URL, PRIVATE_KEY, POLYGONSCAN_API_KEY } = process.env;
 const networks = {};
 
 if (AMOY_RPC_URL) {
-  networks.amoy = {
+  const amoyNetwork = {
     url: AMOY_RPC_URL,
     chainId: 80002,
     accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
   };
+
+  networks.amoy = amoyNetwork;
+  networks.polygonAmoy = amoyNetwork;
 }
 
 module.exports = {
@@ -24,6 +27,9 @@ module.exports = {
     }
   },
   networks,
+  etherscan: {
+    apiKey: POLYGONSCAN_API_KEY || ""
+  },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
     currency: "USD",

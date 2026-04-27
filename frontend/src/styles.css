@@ -224,6 +224,15 @@ code {
   align-items: center;
   gap: 0.85rem;
   margin-bottom: 1.35rem;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.brand-mark:hover {
+  opacity: 0.9;
+  transform: translateX(2px);
 }
 
 .brand-mark > span {
@@ -784,6 +793,18 @@ code {
   padding: 0.62rem;
 }
 
+.address-value {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.address-value strong {
+  color: var(--color-ink);
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
 .address-line code,
 .breakable {
   overflow-wrap: anywhere;
@@ -871,6 +892,104 @@ code {
   border: 1px solid rgba(163, 50, 58, 0.26);
 }
 
+.consumer-summary {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.consumer-verdict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+}
+
+.consumer-verdict h3 {
+  margin: 0.25rem 0;
+  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
+  letter-spacing: -0.045em;
+}
+
+.consumer-verdict p {
+  margin: 0;
+}
+
+.consumer-verdict.success {
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border-color: rgba(34, 118, 86, 0.24);
+}
+
+.consumer-verdict.warning {
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border-color: rgba(154, 90, 0, 0.28);
+}
+
+.consumer-verdict.danger {
+  color: var(--color-danger);
+  background: var(--color-danger-container);
+  border-color: rgba(163, 50, 58, 0.28);
+}
+
+.consumer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.72rem;
+}
+
+.consumer-card-grid article,
+.consumer-chain {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.84rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.consumer-card-grid span {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.consumer-card-grid strong {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 1rem;
+}
+
+.consumer-card-grid p,
+.consumer-chain p {
+  margin: 0.38rem 0 0;
+}
+
+.consumer-chain-steps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.consumer-chain-steps span {
+  border-radius: var(--radius-pill);
+  background: var(--color-ice);
+  color: var(--color-cold);
+  font-weight: 850;
+  padding: 0.42rem 0.72rem;
+}
+
+.consumer-chain-steps b {
+  color: var(--color-secondary);
+}
+
 .qr-box {
   background: var(--color-surface);
   padding: 0.55rem;
@@ -891,10 +1010,16 @@ code {
   padding: 0.62rem;
 }
 
-.wallet-row button {
+.wallet-actions {
   grid-column: 2;
   grid-row: 1 / span 2;
+  display: grid;
+  gap: 0.28rem;
   align-self: center;
+}
+
+.wallet-actions button {
+  white-space: nowrap;
 }
 
 .activity-list {
@@ -1076,8 +1201,14 @@ code {
   .hero-actions,
   .hero-wallet-actions,
   .metric-grid,
+  .consumer-card-grid,
   .metadata-grid {
     grid-template-columns: 1fr;
+  }
+
+  .consumer-verdict {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .session-actions {

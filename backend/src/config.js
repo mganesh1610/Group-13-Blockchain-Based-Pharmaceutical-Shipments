@@ -13,16 +13,22 @@ function resolveUploadDir() {
 }
 
 function corsOrigins() {
-  const defaults = ["http://localhost:5173"];
+  const defaults = ["http://localhost:5173", "https://coldchain-provenance.vercel.app"];
 
   if (process.env.VERCEL_URL) {
     defaults.push(`https://${process.env.VERCEL_URL}`);
   }
 
-  return (process.env.CORS_ORIGIN || defaults.join(","))
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    defaults.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  }
+
+  const configuredOrigins = (process.env.CORS_ORIGIN || "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  return Array.from(new Set([...defaults, ...configuredOrigins]));
 }
 
 function azureSqlConfig() {
