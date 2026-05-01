@@ -201,3 +201,166 @@ The app supports role-based stakeholder access, batch registration, custody tran
 Pharmaceutical cold-chain shipments involve multiple organizations that need to trust the same custody and condition history. A blockchain-based design provides a shared, append-only audit trail where custody transfers, condition proofs, verifications, and recalls can be independently checked by stakeholders and consumers.
 
 The system still keeps raw IoT data off-chain for cost and scalability reasons. The blockchain is used for accountability, tamper-evidence, and role-based workflow enforcement rather than as a bulk data store.
+
+## Optional Backup: Local Setup and Deployment
+
+The live application above is the primary grading path. This section is included only as a backup if the grader wants to inspect, test, or redeploy the project from source.
+
+### Prerequisites
+
+- Node.js 20 or later
+- npm
+- MetaMask browser extension
+- Polygon Amoy test `POL` only if redeploying or writing transactions on Amoy
+- A PolygonScan API key only if verifying a new deployed contract
+
+### Install Dependencies
+
+Install dependencies in all three project areas:
+
+```bash
+npm ci
+npm ci --prefix backend
+npm ci --prefix frontend
+```
+
+### Run Tests
+
+Run the smart contract tests:
+
+```bash
+npm run test:contract
+```
+
+Run the backend API tests:
+
+```bash
+npm --prefix backend test
+```
+
+Run the frontend tests:
+
+```bash
+npm --prefix frontend test
+```
+
+Run all major test suites:
+
+```bash
+npm run test:all
+```
+
+Build the frontend production bundle:
+
+```bash
+npm --prefix frontend run build
+```
+
+### Local Environment Files
+
+Create a root `.env` only if deploying or interacting with Polygon Amoy from the command line:
+
+```text
+AMOY_RPC_URL=https://rpc-amoy.polygon.technology/
+PRIVATE_KEY=<deployer private key>
+ADMIN_ADDRESS=<admin wallet address>
+POLYGONSCAN_API_KEY=<optional polygonscan api key>
+```
+
+Create `backend/.env` only if running the backend outside Vercel:
+
+```text
+PORT=4000
+CORS_ORIGIN=http://localhost:5173
+AZURE_SQL_SERVER=<optional server>.database.windows.net
+AZURE_SQL_DATABASE=<optional database name>
+AZURE_SQL_USER=<optional sql username>
+AZURE_SQL_PASSWORD=<optional sql password>
+AZURE_SQL_ENCRYPT=true
+AZURE_STORAGE_CONNECTION_STRING=<optional azure storage connection string>
+AZURE_STORAGE_CONTAINER=iot-logs
+```
+
+Create `frontend/.env` only if running the frontend outside Vercel:
+
+```text
+VITE_RPC_URL=http://127.0.0.1:8545
+VITE_BACKEND_URL=http://localhost:4000
+VITE_CONTRACT_ADDRESS=
+VITE_BASE_PATH=/
+```
+
+Do not commit `.env` files, wallet private keys, API keys, database passwords, or storage connection strings.
+
+### Run Locally with Hardhat
+
+Start a local Hardhat blockchain:
+
+```bash
+npm run node
+```
+
+In a second terminal, deploy the contract to the local Hardhat network:
+
+```bash
+npm run deploy:local
+```
+
+In a third terminal, start the backend:
+
+```bash
+npm run dev:backend
+```
+
+In a fourth terminal, start the frontend:
+
+```bash
+npm run dev:frontend
+```
+
+Open the frontend URL printed by Vite, usually:
+
+```text
+http://localhost:5173
+```
+
+For local testing, import Hardhat test accounts into MetaMask, switch MetaMask to a local Hardhat network using RPC `http://127.0.0.1:8545` and chain ID `31337`, then use the app the same way as the live workflow.
+
+### Redeploy to Polygon Amoy
+
+The already deployed grading contract is:
+
+```text
+0xAFdcF244CAb9d632946c42A07463F3105B605EF0
+```
+
+Redeployment is not required for grading. If a new testnet deployment is needed, make sure the deployer wallet has Amoy test `POL`, configure the root `.env`, then run:
+
+```bash
+npm run deploy -- --network amoy
+```
+
+The deploy script prints the new contract address and writes the latest deployment details to:
+
+```text
+frontend/public/demo-contract.json
+```
+
+If the web app should point to a new Amoy contract, set Vercel environment variables accordingly:
+
+```text
+VITE_RPC_URL=https://rpc-amoy.polygon.technology/
+VITE_CONTRACT_ADDRESS=<new deployed Amoy contract address>
+```
+
+Leave `VITE_BACKEND_URL` blank on Vercel so the frontend uses same-domain `/api` routes.
+
+### Verify a New Contract on PolygonScan
+
+The grading contract is already verified on PolygonScan. For a new deployment, verify with the deployed contract address and the admin constructor argument:
+
+```bash
+npx hardhat verify --network polygonAmoy <new deployed contract address> <admin wallet address>
+```
+
+After verification, PolygonScan can decode contract functions and events such as `BatchRegistered`, `CustodyTransferred`, `ConditionRecorded`, `VerificationAdded`, and `BatchRecalled`.
