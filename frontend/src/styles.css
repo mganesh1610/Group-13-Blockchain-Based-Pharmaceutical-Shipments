@@ -181,6 +181,27 @@ code {
   grid-template-columns: 300px minmax(0, 1fr);
 }
 
+.app-shell.rail-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rail-toggle {
+  position: fixed;
+  top: 0.85rem;
+  left: calc(300px + 0.85rem);
+  z-index: 20;
+  min-height: 34px;
+  padding: 0.46rem 0.76rem;
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-sm);
+}
+
+.rail-hidden .rail-toggle {
+  left: 0.85rem;
+}
+
 .side-rail {
   position: sticky;
   top: 0;
@@ -1059,6 +1080,33 @@ code {
   display: none;
 }
 
+.inline-status {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  padding: 0.72rem 0.82rem;
+  color: var(--color-secondary);
+  background: rgba(255, 255, 255, 0.7);
+  font-weight: 700;
+}
+
+.inline-status.working {
+  color: var(--color-cold-dark);
+  background: var(--color-cold-container);
+  border-color: rgba(15, 111, 120, 0.22);
+}
+
+.inline-status.success {
+  color: var(--color-success);
+  background: var(--color-success-container);
+  border-color: rgba(42, 124, 85, 0.26);
+}
+
+.inline-status.error {
+  color: var(--color-danger);
+  background: var(--color-danger-container);
+  border-color: rgba(163, 50, 58, 0.24);
+}
+
 .log-result,
 .match-result,
 .mismatch-result,
@@ -1158,9 +1206,15 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .rail-toggle,
+  .rail-hidden .rail-toggle {
+    left: 0.85rem;
+  }
+
   .side-rail {
     position: relative;
     height: auto;
+    padding-top: 3.3rem;
   }
 
   .workspace {

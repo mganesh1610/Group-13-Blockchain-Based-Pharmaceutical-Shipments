@@ -778,6 +778,7 @@ function ConsumerSummary({ trace }) {
 function Layout({ app, children }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isRailHidden, setIsRailHidden] = useState(false);
   const visibleNavItems = navItems.filter((item) => canAccessNavItem(item, app.walletRoles));
   const visibleWorkspaceItems = visibleNavItems.filter((item) => item.sidebarLabel && item.to !== "/");
   const showSandboxTools = !app.walletAddress || app.walletRoles.includes("Admin");
@@ -805,8 +806,18 @@ function Layout({ app, children }) {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="side-rail" aria-label="Control sidebar">
+    <div className={`app-shell${isRailHidden ? " rail-hidden" : ""}`}>
+      <button
+        type="button"
+        className="rail-toggle"
+        aria-controls="control-sidebar"
+        aria-expanded={!isRailHidden}
+        onClick={() => setIsRailHidden((current) => !current)}
+      >
+        {isRailHidden ? "Show Menu" : "Hide Menu"}
+      </button>
+
+      <aside id="control-sidebar" className="side-rail" aria-label="Control sidebar" hidden={isRailHidden}>
         <NavLink className="brand-mark" to="/" aria-label="Open dashboard">
           <span>CC</span>
           <div>
@@ -1411,32 +1422,66 @@ function ConditionsPage({ app }) {
   const [scenario, setScenario] = useState("normal");
   const [file, setFile] = useState(null);
   const [logResult, setLogResult] = useState(null);
+  const [processingAction, setProcessingAction] = useState("");
+  const [logMessage, setLogMessage] = useState("");
 
   useEffect(() => setBatchId(app.activeBatchId), [app.activeBatchId]);
 
   async function simulate() {
+    const cleanBatchId = batchId.trim();
+    if (!cleanBatchId) {
+      const message = "Enter a Batch ID before generating a simulated IoT log.";
+      setLogMessage(message);
+      app.setNotice({ type: "error", message });
+      return;
+    }
+
+    setLogResult(null);
+    setProcessingAction("simulate");
+    setLogMessage("Generating simulated IoT log...");
+
     try {
       const result = await app.callBackend("/api/logs/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batchId, scenario })
+        body: JSON.stringify({ batchId: cleanBatchId, scenario, readingCount: 12 })
       });
       setLogResult(result);
+      setBatchId(cleanBatchId);
+      setLogMessage(`Simulation ready: ${result.summary}`);
       app.setNotice({ type: result.breachFlag ? "warning" : "success", message: result.summary });
     } catch (error) {
-      app.setNotice({ type: "error", message: parseError(error) });
+      const message = parseError(error);
+      setLogMessage(message);
+      app.setNotice({ type: "error", message });
+    } finally {
+      setProcessingAction("");
     }
   }
 
   async function upload() {
-    if (!file) {
-      app.setNotice({ type: "error", message: "Choose a JSON or CSV IoT log first." });
+    const cleanBatchId = batchId.trim();
+    if (!cleanBatchId) {
+      const message = "Enter a Batch ID before processing an uploaded IoT log.";
+      setLogMessage(message);
+      app.setNotice({ type: "error", message });
       return;
     }
 
+    if (!file) {
+      const message = "Choose a JSON or CSV IoT log first.";
+      setLogMessage(message);
+      app.setNotice({ type: "error", message });
+      return;
+    }
+
+    setLogResult(null);
+    setProcessingAction("upload");
+    setLogMessage("Processing uploaded IoT log...");
+
     try {
       const formData = new FormData();
-      formData.append("batchId", batchId);
+      formData.append("batchId", cleanBatchId);
       formData.append("file", file);
 
       const result = await app.callBackend("/api/logs/upload", {
@@ -1444,9 +1489,15 @@ function ConditionsPage({ app }) {
         body: formData
       });
       setLogResult(result);
+      setBatchId(cleanBatchId);
+      setLogMessage(`Upload processed: ${result.summary}`);
       app.setNotice({ type: result.breachFlag ? "warning" : "success", message: result.summary });
     } catch (error) {
-      app.setNotice({ type: "error", message: parseError(error) });
+      const message = parseError(error);
+      setLogMessage(message);
+      app.setNotice({ type: "error", message });
+    } finally {
+      setProcessingAction("");
     }
   }
 
@@ -1487,17 +1538,26 @@ function ConditionsPage({ app }) {
           </select>
         </Field>
         <div className="button-row">
-          <button type="button" onClick={simulate}>
-            Generate Simulated Log
+          <button type="button" onClick={simulate} disabled={Boolean(processingAction)}>
+            {processingAction === "simulate" ? "Generating..." : "Generate Simulated Log"}
           </button>
           <label className="file-picker">
-            Upload JSON/CSV
-            <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(event) => setFile(event.target.files[0])} />
+            {file ? file.name : "Upload JSON/CSV"}
+            <input
+              type="file"
+              accept=".json,.csv,application/json,text/csv"
+              onChange={(event) => setFile(event.target.files[0])}
+            />
           </label>
-          <button type="button" className="secondary" onClick={upload}>
-            Process Upload
+          <button type="button" className="secondary" onClick={upload} disabled={Boolean(processingAction)}>
+            {processingAction === "upload" ? "Processing..." : "Process Upload"}
           </button>
         </div>
+        {logMessage ? (
+          <div className={`inline-status${processingAction ? " working" : logResult ? " success" : " error"}`}>
+            {logMessage}
+          </div>
+        ) : null}
       </div>
 
       <div className="page-card">
