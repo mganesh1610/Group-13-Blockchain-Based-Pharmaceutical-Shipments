@@ -36,6 +36,7 @@ const POLYGON_AMOY_NETWORK_PARAMS = {
   rpcUrls: ["https://rpc-amoy.polygon.technology/"],
   blockExplorerUrls: ["https://amoy.polygonscan.com/"]
 };
+const POLYGON_AMOY_EXPLORER_URL = "https://amoy.polygonscan.com";
 const LOCAL_CONDITION_LOG_CACHE_KEY = "coldchain.localConditionLogs.v1";
 const STATUS_OPTIONS = statusLabels
   .map((label, value) => ({ label, value }))
@@ -363,6 +364,22 @@ function isPolygonAmoyConnection({ rpcUrl, contractAddress }) {
   );
 }
 
+function contractExplorerUrl({ contractAddress, rpcUrl, networkStatus }) {
+  if (!ethers.isAddress(contractAddress)) {
+    return "";
+  }
+
+  if (isLocalSandboxConnection({ rpcUrl, contractAddress, networkStatus })) {
+    return "";
+  }
+
+  if (!isPolygonAmoyConnection({ rpcUrl, contractAddress })) {
+    return "";
+  }
+
+  return `${POLYGON_AMOY_EXPLORER_URL}/address/${contractAddress}`;
+}
+
 async function switchToPolygonAmoy(browserProvider) {
   try {
     await browserProvider.send("wallet_switchEthereumChain", [{ chainId: POLYGON_AMOY_CHAIN_HEX }]);
@@ -686,7 +703,7 @@ function TimelineList({ empty, items, render }) {
   return <div className="timeline-list">{items.map(render)}</div>;
 }
 
-function TraceView({ trace, onCopy }) {
+function TraceView({ trace, onCopy, contractAddress, contractExplorerUrl }) {
   if (!trace) {
     return <p className="muted">Load a batch to view blockchain provenance records.</p>;
   }
@@ -746,6 +763,19 @@ function TraceView({ trace, onCopy }) {
             <strong>{batch.lastStatusNote || "No status note"}</strong>
           </div>
         </div>
+
+        {contractExplorerUrl ? (
+          <div className="contract-proof-card">
+            <div>
+              <span>Smart contract proof</span>
+              <strong>{shortAddress(contractAddress)}</strong>
+              <p>Open the deployed contract on PolygonScan to inspect transactions, events, and verified activity.</p>
+            </div>
+            <a href={contractExplorerUrl} target="_blank" rel="noreferrer">
+              View Contract
+            </a>
+          </div>
+        ) : null}
 
         <div className="address-grid">
           <AddressLine
@@ -1137,6 +1167,13 @@ function Layout({ app, children }) {
               <span>Access Mode</span>
               <strong>{roleAccessLabel(app.walletRoles, app.walletAddress)}</strong>
             </div>
+            {app.contractExplorerUrl ? (
+              <a className="contract-scan-link" href={app.contractExplorerUrl} target="_blank" rel="noreferrer">
+                <span>Contract</span>
+                <strong>{shortAddress(app.contractAddress)}</strong>
+                <small>Open PolygonScan</small>
+              </a>
+            ) : null}
             {app.walletAddress ? (
               <div className="hero-wallet-actions">
                 <button type="button" onClick={app.connectWallet}>
@@ -1935,7 +1972,12 @@ function TracePage({ app }) {
         <input value={query} onChange={(event) => setQuery(event.target.value)} />
         <button type="submit">Load Batch</button>
       </form>
-      <TraceView trace={app.currentTrace} onCopy={app.copyText} />
+      <TraceView
+        trace={app.currentTrace}
+        onCopy={app.copyText}
+        contractAddress={app.contractAddress}
+        contractExplorerUrl={app.contractExplorerUrl}
+      />
     </section>
   );
 }
@@ -2778,12 +2820,15 @@ function ColdChainApp() {
     }
   }
 
+  const activeContractExplorerUrl = contractExplorerUrl({ contractAddress, rpcUrl, networkStatus });
+
   const app = {
     rpcUrl,
     setRpcUrl,
     backendUrl,
     setBackendUrl,
     contractAddress,
+    contractExplorerUrl: activeContractExplorerUrl,
     setContractAddress,
     activeBatchId,
     setActiveBatchId,

@@ -609,6 +609,42 @@ code {
   grid-column: auto;
 }
 
+.contract-scan-link {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.16rem;
+  min-height: 58px;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid rgba(0, 110, 120, 0.24);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  background: linear-gradient(135deg, rgba(214, 242, 245, 0.9), rgba(255, 255, 255, 0.76));
+  box-shadow: var(--shadow-sm);
+}
+
+.contract-scan-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 110, 120, 0.42);
+}
+
+.contract-scan-link span,
+.contract-proof-card span {
+  color: var(--color-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.contract-scan-link strong {
+  color: var(--color-ink);
+  font-size: 0.9rem;
+}
+
+.contract-scan-link small {
+  font-weight: 850;
+}
+
 .logout-button {
   min-width: 104px;
 }
@@ -889,6 +925,39 @@ code {
 .metadata-grid strong {
   display: block;
   margin-top: 0.25rem;
+}
+
+.contract-proof-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.78rem 0;
+  padding: 0.78rem;
+  border: 1px solid rgba(0, 110, 120, 0.24);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(214, 242, 245, 0.82), rgba(255, 255, 255, 0.72));
+  box-shadow: var(--shadow-sm);
+}
+
+.contract-proof-card strong {
+  display: block;
+  margin-top: 0.22rem;
+}
+
+.contract-proof-card p {
+  margin: 0.25rem 0 0;
+  color: var(--color-secondary);
+}
+
+.contract-proof-card a {
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  padding: 0.58rem 0.9rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-action), var(--color-action-dark));
+  box-shadow: var(--shadow-sm);
+  font-weight: 850;
 }
 
 .address-grid {
@@ -1362,7 +1431,8 @@ code {
 
   .panel-heading,
   .search-row,
-  .button-row {
+  .button-row,
+  .contract-proof-card {
     align-items: stretch;
     flex-direction: column;
   }
