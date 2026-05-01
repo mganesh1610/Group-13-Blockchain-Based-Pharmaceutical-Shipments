@@ -816,7 +816,13 @@ function Layout({ app, children }) {
         title={isRailHidden ? "Show menu" : "Hide menu"}
         onClick={() => setIsRailHidden((current) => !current)}
       >
-        {isRailHidden ? ">" : "<"}
+        <span className="rail-toggle__icon" aria-hidden="true">
+          <span className="rail-toggle__bar" />
+          <span className="rail-toggle__bar" />
+          <span className="rail-toggle__bar" />
+          <span className="rail-toggle__chevron" />
+        </span>
+        <span className="sr-only">{isRailHidden ? "Show sidebar menu" : "Hide sidebar menu"}</span>
       </button>
 
       <aside id="control-sidebar" className="side-rail" aria-label="Control sidebar" hidden={isRailHidden}>
