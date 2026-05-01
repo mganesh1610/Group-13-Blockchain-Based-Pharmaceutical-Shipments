@@ -5,18 +5,25 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "test:contract": "hardhat test",
+    "test:all": "npm run test:contract && npm --prefix backend test && npm --prefix frontend test",
+    "gas": "cross-env REPORT_GAS=true hardhat test",
     "node": "hardhat node",
     "deploy": "hardhat run scripts/deploy.js",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "demo:flow": "hardhat run scripts/demoFlow.js",
-    "seed:roles": "hardhat run scripts/seedRoles.js"
+    "seed:roles": "hardhat run scripts/seedRoles.js",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.1.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
-    "hardhat": "^2.22.17"
+    "hardhat": "^2.22.17",
+    "hardhat-gas-reporter": "^1.0.10"
   }
 }
