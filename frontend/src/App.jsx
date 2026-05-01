@@ -68,7 +68,7 @@ const navItems = [
   {
     label: "Transfer Custody",
     to: "/transfer",
-    roles: ["Manufacturer", "Distributor"],
+    roles: ["Manufacturer", "Distributor", "Admin"],
     sidebarLabel: "Custody Transfer"
   },
   {
@@ -1311,6 +1311,10 @@ function TransferPage({ app }) {
 
   return (
     <FormCard title="Transfer Custody" eyebrow="Current Custodian Action" onSubmit={submit}>
+      <p className="muted">
+        Normal custody moves through operational stakeholders. Regulators review, verify, and recall batches without
+        receiving physical custody; admin access is an override for correcting or recovering custody flow.
+      </p>
       <Field label="Batch ID">
         <input value={form.batchId} onChange={(event) => setForm({ ...form, batchId: event.target.value })} />
       </Field>
