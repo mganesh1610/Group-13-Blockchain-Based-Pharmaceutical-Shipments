@@ -812,9 +812,11 @@ function Layout({ app, children }) {
         className="rail-toggle"
         aria-controls="control-sidebar"
         aria-expanded={!isRailHidden}
+        aria-label={isRailHidden ? "Show sidebar menu" : "Hide sidebar menu"}
+        title={isRailHidden ? "Show menu" : "Hide menu"}
         onClick={() => setIsRailHidden((current) => !current)}
       >
-        {isRailHidden ? "Show Menu" : "Hide Menu"}
+        {isRailHidden ? ">" : "<"}
       </button>
 
       <aside id="control-sidebar" className="side-rail" aria-label="Control sidebar" hidden={isRailHidden}>
