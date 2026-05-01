@@ -209,6 +209,10 @@ function parseError(error) {
     return "Only the current distributor/retailer custodian, regulator, or admin can anchor this condition log. Transfer custody to the connected wallet first, then retry.";
   }
 
+  if (/Recipient must be manufacturer, distributor, or retailer/i.test(joined)) {
+    return "Custody can only be transferred to a Manufacturer, Distributor, or Retailer wallet. Regulators review and verify without receiving shipment custody.";
+  }
+
   if (/unknown custom error/i.test(joined)) {
     return "Connected wallet does not have the required smart-contract role for this transaction.";
   }
@@ -1302,9 +1306,21 @@ function TransferPage({ app }) {
   async function submit(event) {
     event.preventDefault();
     await app.runWalletWrite("Custody transfer", async (contract, overrides) => {
-      const tx = await contract.transferCustody(form.batchId, form.to, form.location, form.notes, overrides);
+      const batchId = form.batchId.trim();
+      const recipient = ethers.getAddress(form.to);
+      const recipientRoles = await detectWalletRoles(contract, recipient);
+      const canHoldCustody = hasAnyRole(recipientRoles, ["Manufacturer", "Distributor", "Retailer"]);
+
+      if (!canHoldCustody) {
+        throw new Error(
+          "Custody can only be transferred to a Manufacturer, Distributor, or Retailer wallet. Regulators review and verify without receiving shipment custody."
+        );
+      }
+
+      const tx = await contract.transferCustody(batchId, recipient, form.location.trim(), form.notes.trim(), overrides);
       await tx.wait();
-      await app.refreshBatch(form.batchId);
+      setForm((current) => ({ ...current, batchId, to: recipient }));
+      await app.refreshBatch(batchId);
       await app.refreshDashboard();
     });
   }
@@ -1312,8 +1328,9 @@ function TransferPage({ app }) {
   return (
     <FormCard title="Transfer Custody" eyebrow="Current Custodian Action" onSubmit={submit}>
       <p className="muted">
-        Normal custody moves through operational stakeholders. Regulators review, verify, and recall batches without
-        receiving physical custody; admin access is an override for correcting or recovering custody flow.
+        Normal custody moves only through Manufacturer, Distributor, and Retailer wallets. Regulators review, verify, and
+        recall batches without receiving physical custody; admin access is an override for correcting or recovering
+        custody flow.
       </p>
       <Field label="Batch ID">
         <input value={form.batchId} onChange={(event) => setForm({ ...form, batchId: event.target.value })} />
