@@ -195,26 +195,6 @@ Frontend dependencies:
 - Ethers v6
 - qrcode.react
 
-## Local Setup
-
-Install root dependencies:
-
-```bash
-npm install
-```
-
-Install backend dependencies:
-
-```bash
-npm --prefix backend install
-```
-
-Install frontend dependencies:
-
-```bash
-npm --prefix frontend install
-```
-
 ## Environment Variables
 
 Root `.env` for deployment:
@@ -280,85 +260,6 @@ Steps to add Polygon Amoy in MetaMask:
 6. Switch MetaMask to `Polygon Amoy Testnet` before using the deployed app.
 
 Polygon Amoy deployments and stakeholder write transactions require Amoy test `POL` for gas. Local Hardhat testing does not require testnet tokens because Hardhat creates pre-funded local test accounts automatically. Testnet tokens have no real-world value and are only used for gas on Polygon Amoy.
-
-## Run Locally
-
-Use four terminals.
-
-Terminal 1: start local blockchain:
-
-```bash
-npm run node
-```
-
-Terminal 2: deploy contract locally:
-
-```bash
-npm run deploy:local
-```
-
-For a fresh clone, this deploys with Hardhat Account 0 as the local admin. If a root `.env` already exists for Polygon Amoy and contains `ADMIN_ADDRESS`, temporarily remove that value for local sandbox testing or override it for the deploy command:
-
-```powershell
-$env:ADMIN_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"; npm run deploy:local
-```
-
-Terminal 3: start backend:
-
-```bash
-npm run dev:backend
-```
-
-Terminal 4: start frontend:
-
-```bash
-npm run dev:frontend
-```
-
-Open:
-
-```text
-http://localhost:5173
-```
-
-## Local MetaMask Testing
-
-The application supports MetaMask-based testing against both a local Hardhat blockchain and the deployed Polygon Amoy contract. MetaMask and the frontend contract settings must point to the same blockchain network for role detection and write transactions to work correctly.
-
-### Option A: Local Hardhat Network
-
-1. Run `npm run node`.
-2. Run `npm run deploy:local`.
-3. In MetaMask, add a custom network:
-   - Network name: `Local Hardhat`
-   - RPC URL: `http://127.0.0.1:8545`
-   - Chain ID: `31337`
-   - Currency symbol: `ETH`
-4. Import the Hardhat demo accounts into MetaMask using the private keys printed by the Hardhat node.
-5. Use Hardhat Account 0 as admin, then grant stakeholder roles or use the `Developer sandbox` shortcuts.
-
-The `Developer sandbox` panel is designed for local grading checks. `Connect Sandbox Network` switches the app to `http://127.0.0.1:8545` and loads the local deployment from `frontend/public/demo-contract.json`. If the contract field still shows the Polygon Amoy address, click `Connect Sandbox Network` again or paste the local Hardhat contract address printed by `npm run deploy:local`.
-
-MetaMask does not allow a web page to import a wallet automatically. After `Connect Sandbox Network`, expand `Sandbox stakeholder addresses` in the left sidebar and use `Copy test key` for the local Hardhat account being imported. Paste that key into MetaMask using `Import account`. These keys are only the public Hardhat development keys and must never be used on a real network.
-
-MetaMask may rename imported accounts as `Imported Account 1`, `Imported Account 2`, and so on. That display name does not need to match the Hardhat account number. Verify the wallet by comparing the address: the local admin is `0xf39F...92266`, manufacturer is `0x7099...79C8`, distributor is `0x3C44...93BC`, retailer is `0x90F7...b906`, and regulator is `0x15d3...6A65`.
-
-### Option B: Local Frontend with Deployed Polygon Amoy Contract
-
-1. Keep the frontend running at `http://localhost:5173`.
-2. Set `frontend/.env` to the deployed testnet contract:
-
-```text
-VITE_RPC_URL=https://rpc-amoy.polygon.technology/
-VITE_BACKEND_URL=http://localhost:4000
-VITE_CONTRACT_ADDRESS=0xAFdcF244CAb9d632946c42A07463F3105B605EF0
-```
-
-3. Restart the Vite frontend after editing `.env`.
-4. Switch MetaMask to `Polygon Amoy`.
-5. Connect the stakeholder wallet and use the role-specific pages.
-
-If MetaMask is on Amoy but the app is configured for local Hardhat, or MetaMask is on local Hardhat but the app is configured for Amoy, role detection and write transactions will not work correctly.
 
 ## How to Use the App
 
