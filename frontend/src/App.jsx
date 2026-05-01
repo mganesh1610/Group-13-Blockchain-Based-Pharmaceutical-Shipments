@@ -1974,18 +1974,43 @@ function ColdChainApp() {
     }
   }
 
-  async function refreshDashboard() {
-    if (!readContract) return;
+  async function loadDashboardFromContract(contract, { silent = false } = {}) {
+    if (!contract) return;
 
     try {
-      const ids = await readContract.getAllBatchIds();
-      const traces = await Promise.all(ids.map((id) => loadBatchTrace(readContract, id)));
+      const ids = await contract.getAllBatchIds();
+      const traces = await Promise.all(ids.map((id) => loadBatchTrace(contract, id)));
       setBatches(traces.filter((trace) => trace && !trace.notFound));
-      addActivity(`Dashboard loaded ${ids.length} batch record(s).`);
+      if (!silent) {
+        addActivity(`Dashboard loaded ${ids.length} batch record(s).`);
+      }
     } catch (error) {
       setNotice({ type: "error", message: parseError(error) });
     }
   }
+
+  async function refreshDashboard() {
+    await loadDashboardFromContract(readContract);
+  }
+
+  useEffect(() => {
+    if (!readContract) return undefined;
+
+    let cancelled = false;
+    setNetworkStatus((current) => (current === "Standby" ? "Read-only" : current));
+    loadDashboardFromContract(readContract, { silent: true });
+    loadBatchTrace(readContract, activeBatchId)
+      .then((trace) => {
+        if (!cancelled) {
+          setCurrentTrace(trace);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [readContract, activeBatchId]);
 
   async function connectWallet({ requestAccounts = true } = {}) {
     try {
