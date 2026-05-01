@@ -1419,7 +1419,23 @@ function TransferPage({ app }) {
 
 function StatusPage({ app }) {
   const [form, setForm] = useState({ batchId: app.activeBatchId, status: "1", notes: "Shipment in transit" });
-  const [currentStatus, setCurrentStatus] = useState(null);
+  const [currentBatch, setCurrentBatch] = useState(null);
+  const currentStatus = currentBatch?.status ?? null;
+  const connectedWallet = app.walletAddress && ethers.isAddress(app.walletAddress) ? ethers.getAddress(app.walletAddress) : "";
+  const currentCustodian =
+    currentBatch?.currentCustodian && ethers.isAddress(currentBatch.currentCustodian)
+      ? ethers.getAddress(currentBatch.currentCustodian)
+      : "";
+  const isCurrentCustodian = Boolean(
+    connectedWallet && currentCustodian && connectedWallet.toLowerCase() === currentCustodian.toLowerCase()
+  );
+  const canSubmitStatus = hasAnyRole(app.walletRoles, ["Admin"]) || isCurrentCustodian;
+  const statusBlockedMessage =
+    currentBatch && !canSubmitStatus
+      ? `Connected wallet ${shortAddress(app.walletAddress)} is not the current custodian ${shortAddress(
+          currentBatch.currentCustodian
+        )}. Use the current custodian wallet or have Admin transfer custody first.`
+      : "";
   const availableStatusOptions = useMemo(
     () => statusOptionsForRoles(app.walletRoles, currentStatus),
     [app.walletRoles, currentStatus]
@@ -1435,7 +1451,7 @@ function StatusPage({ app }) {
     async function loadCurrentStatus() {
       const batchId = form.batchId.trim();
       if (!app.readContract || !batchId) {
-        setCurrentStatus(null);
+        setCurrentBatch(null);
         return;
       }
 
@@ -1444,17 +1460,17 @@ function StatusPage({ app }) {
         if (!isCurrent) return;
 
         if (!exists) {
-          setCurrentStatus(null);
+          setCurrentBatch(null);
           return;
         }
 
         const batch = normalizeBatch(await app.readContract.getBatch(batchId));
         if (isCurrent) {
-          setCurrentStatus(batch.status);
+          setCurrentBatch(batch);
         }
       } catch {
         if (isCurrent) {
-          setCurrentStatus(null);
+          setCurrentBatch(null);
         }
       }
     }
@@ -1477,11 +1493,20 @@ function StatusPage({ app }) {
   async function submit(event) {
     event.preventDefault();
     await app.runWalletWrite("Status update", async (contract, overrides) => {
-      const tx = await contract.updateStatus(form.batchId, Number(form.status), form.notes, overrides);
+      const cleanBatchId = form.batchId.trim();
+      if (!cleanBatchId) {
+        throw new Error("Enter a Batch ID before updating status.");
+      }
+
+      if (!canSubmitStatus) {
+        throw new Error(statusBlockedMessage || "Only the current custodian or admin can update this batch status.");
+      }
+
+      const tx = await contract.updateStatus(cleanBatchId, Number(form.status), form.notes, overrides);
       await tx.wait();
-      const trace = await app.refreshBatch(form.batchId);
+      const trace = await app.refreshBatch(cleanBatchId);
       if (trace && !trace.notFound) {
-        setCurrentStatus(trace.batch.status);
+        setCurrentBatch(trace.batch);
       }
       await app.refreshDashboard();
     });
@@ -1508,10 +1533,17 @@ function StatusPage({ app }) {
       <p className="muted">
         Current status: {currentStatus === null ? "Load or enter a registered batch ID" : statusLabels[currentStatus]}.
       </p>
+      {currentBatch ? (
+        <p className="muted">
+          Current custodian: {shortAddress(currentBatch.currentCustodian)}. Delivered becomes available when the current
+          status is Received, Stored, or Flagged.
+        </p>
+      ) : null}
+      {statusBlockedMessage ? <div className="inline-status error">{statusBlockedMessage}</div> : null}
       <Field label="Notes">
         <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </Field>
-      <button type="submit" disabled={!availableStatusOptions.length}>
+      <button type="submit" disabled={!availableStatusOptions.length || Boolean(statusBlockedMessage)}>
         Submit updateStatus()
       </button>
     </FormCard>
