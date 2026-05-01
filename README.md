@@ -2,117 +2,166 @@
 
 ## Project Description
 
-This project is a blockchain-powered supply chain provenance system for temperature-sensitive pharmaceutical shipments. It tracks a product batch from manufacturer registration through distributor shipment, IoT condition logging, retailer delivery, regulator verification, recall handling, and public consumer verification.
+This project is a blockchain-powered provenance system for temperature-sensitive pharmaceutical shipments. It tracks a batch from manufacturer registration through custody transfer, condition logging, retailer delivery, regulator verification, recall handling, and public consumer verification.
 
-The goal is to show why blockchain is useful for multi-party supply chain traceability. The smart contract records role-controlled lifecycle events, custody transfers, condition log hashes, regulator decisions, and recall actions. Raw IoT logs are stored off-chain and verified by comparing their `keccak256` hash with the digest anchored on-chain.
+The system uses a Polygon Amoy smart contract for the auditable proof trail and a Vercel-hosted web app for stakeholder interaction. Large IoT condition files are kept off-chain, while their `keccak256` hashes and summaries are anchored on-chain for tamper-evidence.
 
-Live deployment:
+## Live Application
 
-- Web app: [https://coldchain-provenance.vercel.app](https://coldchain-provenance.vercel.app)
-- Polygon Amoy contract: `0xAFdcF244CAb9d632946c42A07463F3105B605EF0`
-- Amoy explorer: [View verified contract on PolygonScan](https://amoy.polygonscan.com/address/0xAFdcF244CAb9d632946c42A07463F3105B605EF0)
+Live app:
 
-Testing options:
+```text
+https://coldchain-provenance.vercel.app
+```
 
-Both live Polygon Amoy testing and local Hardhat sandbox testing are supported. The live app can be used for the deployed testnet workflow, while the local setup can be used for source-code verification and repeatable sandbox testing. Detailed instructions for both options are provided later in this README.
+Deployed Polygon Amoy contract:
 
-## Stakeholders and Permissions
+```text
+0xAFdcF244CAb9d632946c42A07463F3105B605EF0
+```
 
-- `Admin`: grants and removes stakeholder roles.
-- `Manufacturer`: registers pharmaceutical batches and starts custody.
-- `Distributor`: receives custody, ships products, and anchors IoT condition logs.
-- `Retailer`: receives shipments and marks delivery.
-- `Regulator`: verifies compliance and can recall a batch.
-- `Consumer`: uses public read-only batch verification without a wallet.
+PolygonScan contract link:
 
-Access is enforced by the Solidity smart contract using OpenZeppelin `AccessControl`. The UI can request a transaction, but unauthorized actions still revert at the contract level.
+```text
+https://amoy.polygonscan.com/address/0xAFdcF244CAb9d632946c42A07463F3105B605EF0
+```
 
-## Stakeholder Access Management
+## MetaMask Network
 
-The `Admin Access` page lets an authorized admin manage stakeholder wallets directly from the web app:
+Add or select this network in MetaMask before using stakeholder wallets.
 
-1. Connect an admin MetaMask wallet.
-2. Paste the stakeholder public wallet address.
-3. Select `Admin`, `Manufacturer`, `Distributor`, `Retailer`, or `Regulator`.
-4. Grant the role to enable that wallet's role-specific pages and contract actions.
-5. Remove the role when a stakeholder should no longer have that access.
+| Field | Value |
+| --- | --- |
+| Network name | `Polygon Amoy Testnet` |
+| RPC URL | `https://rpc-amoy.polygon.technology/` |
+| Chain ID | `80002` |
+| Currency symbol | `POL` |
+| Block explorer URL | `https://amoy.polygonscan.com/` |
 
-The connected wallet address determines access. The physical computer, browser, or location does not grant permissions by itself.
+The grader wallets have Polygon Amoy test `POL` for gas. Test `POL` has no real-world value and is only used to pay transaction fees on the Amoy testnet.
 
-Current live UI behavior:
+## Grader Wallets
 
-- `Admin` sees `Admin Access` plus public/read-only pages.
-- `Manufacturer` sees batch registration and custody-transfer actions.
-- `Distributor` sees custody transfer, status update, and condition-log actions.
-- `Retailer` sees status update and condition-log actions.
-- `Regulator` sees regulator review actions.
-- `Consumer` does not need a role or wallet for public verification.
+A funded Polygon Amoy test wallet set has been prepared for live grading. Import the private keys from the Canvas submission notes into MetaMask using `Import Account`, then switch MetaMask to `Polygon Amoy Testnet`.
 
-If an admin wallet also shows manufacturer, distributor, retailer, or regulator pages, that means the wallet has also been granted those on-chain roles. Use `Admin Access` to remove extra operational roles if strict role separation is desired.
+Private keys are not committed in this public repository. The public addresses below are derived from the grader wallet keys and are already role-enabled on the deployed contract.
 
-Notification banners clear automatically when moving between app sections, so a message from one workflow does not stay visible on another page.
+| Stakeholder | Public Wallet Address | Live Contract Role |
+| --- | --- | --- |
+| Admin | `0x9287E3aAB5c5939845409fd7C16044FA7eBE3B1e` | `Admin` |
+| Manufacturer | `0xd4c2cF2D15b9c482d2Bd1E531Ac965A4281703e7` | `Manufacturer` |
+| Distributor | `0xbcB91166e79365aC9F356969F604010c3e144bF3` | `Distributor` |
+| Retailer | `0xa2Dd43ff5436F310db632B24fCB9E2BE865a3cc1` | `Retailer` |
+| Regulator | `0x5557841ceF7A1d7911F65e147f5a004DeCDeB0eC` | `Regulator` |
+| Customer | `0xEa5b6aDe8B95f326c2A5853872789247863CB419` | Public read-only |
 
-Role-specific lifecycle behavior:
+The consumer/customer flow does not require a wallet role. `Consumer Verify`, QR trace lookup, and tamper-evidence checks are public read-only flows.
 
-- The contract does not decide that an address is a distributor or retailer based only on transfer order.
-- A wallet represents a stakeholder because the admin granted that wallet the matching on-chain role.
-- Custody transfer moves the batch to a recipient wallet address.
-- The recipient wallet's granted role determines what pages and contract actions become available after connection.
-- Distributor status updates are normally used for shipment and storage activity.
-- Retailer status updates are normally used for receipt and final delivery.
-- Regulator actions are separated from logistics actions and are used for verification or recall.
+## Live Testing Steps
 
-## Architecture Diagram
+1. Import the grader private keys into MetaMask using `Import Account`.
+2. Switch MetaMask to `Polygon Amoy Testnet`.
+3. Open [https://coldchain-provenance.vercel.app](https://coldchain-provenance.vercel.app).
+4. Click `Connect Stakeholder Wallet`.
+5. Connect the admin wallet and open `Admin Access` to confirm stakeholder role assignments.
+6. Switch to the manufacturer wallet and reconnect in the app.
+7. Open `Register Batch` and create a fresh batch ID, for example `BATCH` plus the current date and time.
+8. Open `Transfer Custody` and transfer the batch to the distributor address.
+9. Switch to the distributor wallet and reconnect.
+10. Open `Status Update` and mark the batch as `Shipped`.
+11. Open `Condition Logs`, generate or upload an IoT condition log, and anchor the condition proof on-chain.
+12. Open `Transfer Custody` and transfer the batch to the retailer address.
+13. Switch to the retailer wallet and reconnect.
+14. Open `Status Update` and mark the batch as `Received` or `Delivered`.
+15. Switch to the regulator wallet and reconnect.
+16. Open `Regulator Review` and add a verification record or recall the batch if testing exception handling.
+17. Open `Batch Trace` to review the full provenance record.
+18. Open `Consumer Verify` to view the simplified public verification result.
+19. Open `Tamper Check`, load the latest condition proof, and run hash verification.
+
+## Supported Live Flows
+
+- Role-based stakeholder access through MetaMask and smart contract permissions
+- Admin role management for manufacturer, distributor, retailer, and regulator wallets
+- Pharmaceutical batch registration
+- Custody transfer between stakeholder wallets
+- Shipment and delivery status updates
+- IoT condition log generation or upload
+- Off-chain IoT log hashing with on-chain proof anchoring
+- Regulator verification and recall handling
+- Consumer verification without a required wallet role
+- QR route lookup for public batch verification
+- Tamper-evidence checking by recomputing the off-chain file hash
+
+## Stakeholder Responsibilities
+
+| Stakeholder | Main Actions |
+| --- | --- |
+| Admin | Grants or removes stakeholder roles |
+| Manufacturer | Registers a batch and transfers initial custody |
+| Distributor | Receives shipment, updates status, anchors IoT condition logs, and transfers custody |
+| Retailer | Receives and marks final delivery |
+| Regulator | Adds compliance verification and can recall a batch |
+| Consumer | Uses public verification and QR trace lookup |
+
+The connected wallet determines access. If a wallet has no assigned role, it can still use the public read-only pages but cannot perform restricted blockchain transactions.
+
+## Tamper-Evidence Flow
+
+The `Tamper Check` page verifies that the off-chain IoT file still matches the digest anchored on-chain.
+
+1. Enter a batch ID with at least one condition log.
+2. Click `Load Latest Condition Proof`.
+3. The app reads the latest on-chain condition record.
+4. Click `Run Hash Verification`.
+5. The backend fetches the stored IoT log, recomputes its `keccak256` hash, and compares it with the on-chain digest.
+6. A valid unmodified file shows `MATCH`.
+7. A changed or different file shows `MISMATCH`.
+
+This check is read-only and does not require a blockchain transaction.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-  wallets["Stakeholder Wallets<br/>Admin, Manufacturer, Distributor,<br/>Retailer, Regulator"]
-  frontend["React + Vite Frontend<br/>Role-specific pages, batch trace,<br/>consumer QR verification, tamper check"]
-  backend["Node.js + Express Backend<br/>IoT simulation/upload, breach detection,<br/>keccak256 hashing, verification API"]
-  storage["Off-chain Storage<br/>Azure Blob Storage for raw logs<br/>Azure SQL for log metadata"]
-  contract["SupplyChainProvenance Contract<br/>RBAC, custody history, statuses,<br/>condition hashes, verification, recall"]
-  consumer["Consumer Verification<br/>Public read-only batch lookup<br/>No MetaMask required"]
+  wallets["Stakeholder Wallets"]
+  frontend["Vercel React App"]
+  api["Vercel API"]
+  storage["Off-Chain IoT Log Storage"]
+  contract["Polygon Amoy Smart Contract"]
+  explorer["PolygonScan"]
+  consumer["Consumer Verification"]
 
-  wallets -->|MetaMask connect| frontend
-  frontend -->|write/read transactions| contract
-  frontend -->|IoT API calls| backend
-  backend -->|raw JSON/CSV logs| storage
-  backend -->|hash, URI, summary| frontend
-  frontend -->|anchor hash proof| contract
-  contract -->|public provenance state| consumer
+  wallets -->|MetaMask| frontend
+  frontend -->|Read/write transactions| contract
+  frontend -->|Log upload and verification| api
+  api --> storage
+  api -->|Hash verification| frontend
+  contract --> explorer
+  consumer --> frontend
+  frontend --> consumer
 ```
 
 ## On-Chain vs Off-Chain Data
 
 On-chain data:
 
-- Batch metadata
-- Current lifecycle status
-- Current custodian
-- Complete custody transfer history
-- IoT log hash and URI
+- Batch ID, product metadata, manufacturer, current custodian, lifecycle status, and recall state
+- Custody transfer history
+- IoT condition log hash, URI, breach flag, and summary
 - Regulator verification records
 - Recall records
 
 Off-chain data:
 
-- Raw JSON/CSV IoT logs
-- Simulated sensor readings
-- Uploaded files for tamper checks
-- Raw file storage in Azure Blob Storage for the live deployment
-- Metadata stored in Azure SQL or local development storage
+- Raw IoT JSON or CSV condition logs
+- Parsed temperature statistics and metadata used by the backend API
 
-This split keeps blockchain storage small while still providing tamper evidence. If a raw log changes, the recomputed hash no longer matches the on-chain digest.
+This split keeps the smart contract auditable while avoiding expensive storage of large sensor files on-chain.
 
-## Main Smart Contract
+## Smart Contract Summary
 
-Main contract:
-
-```text
-contracts/SupplyChainProvenance.sol
-```
-
-Core functions:
+The deployed contract is `SupplyChainProvenance`. It supports:
 
 - `registerBatch`
 - `transferCustody`
@@ -126,420 +175,29 @@ Core functions:
 - `getVerificationHistory`
 - `getRecallInfo`
 
-Lifecycle statuses:
+Contract events include:
 
-- `Created`
-- `Shipped`
-- `Received`
-- `Stored`
-- `Delivered`
-- `Flagged`
-- `Recalled`
+- `BatchRegistered`
+- `CustodyTransferred`
+- `StatusUpdated`
+- `ConditionRecorded`
+- `VerificationAdded`
+- `BatchRecalled`
 
-The contract also emits events for batch registration, custody transfers, status updates, condition anchoring, regulator verification, and recall actions. These events provide an auditable sequence of stakeholder activity that complements the stored batch history.
+The contract is verified on PolygonScan, so grader transactions and emitted events can be inspected from the explorer link above.
 
-## Implemented Scope
+## Grading Notes
 
-- Multi-party lifecycle: manufacturer, distributor, retailer, regulator, and consumer.
-- Product journey: creation, shipment, storage/condition logging, delivery, verification, and recall handling.
-- Required transactions: registration, custody transfer, status update, condition update, regulator verification, and exception handling.
-- Access control: OpenZeppelin `AccessControl` roles with contract-level enforcement and revert behavior.
-- Provenance: complete custody history and condition/verification timelines are displayed in the UI.
-- Off-chain storage: raw IoT logs stay off-chain while hashes and summaries are anchored on-chain.
-- Tamper evidence: uploaded or generated logs can be re-hashed and compared against the on-chain digest.
+Use a fresh batch ID for each test run to avoid `Batch already registered` errors. A simple format such as `BATCH20260501A` works well.
 
-## Source Code Layout
+If MetaMask does not show the expected role after switching accounts, disconnect or logout in the app, switch the selected MetaMask account, then click `Connect Stakeholder Wallet` again.
 
-```text
-contracts/          Solidity smart contract
-scripts/            Hardhat deployment and demo scripts
-test/               Smart contract tests
-backend/            Express API for IoT logs and off-chain storage
-frontend/           React + Vite frontend
-api/                Vercel serverless entrypoint for the Express app
-vercel.json         Vercel deployment configuration
-```
+If a transaction fails because of gas, confirm the wallet is on `Polygon Amoy Testnet` and has test `POL`. The prepared grader wallets were funded for live testing.
 
-## Dependencies
-
-Required:
-
-- Node.js 20 or later
-- npm
-- MetaMask browser extension
-- Polygon Amoy test `POL` for testnet deployment and write transactions
-
-Blockchain dependencies:
-
-- Solidity `0.8.20`
-- Hardhat
-- OpenZeppelin Contracts
-- Ethers v6
-- hardhat-gas-reporter
-
-Backend dependencies:
-
-- Express
-- Multer
-- CORS
-- dotenv
-- ethers
-- mssql
-- @azure/storage-blob
-
-Frontend dependencies:
-
-- React
-- Vite
-- React Router
-- Ethers v6
-- qrcode.react
-
-## Environment Variables
-
-Root `.env` for deployment:
-
-```text
-AMOY_RPC_URL=https://rpc-amoy.polygon.technology/
-PRIVATE_KEY=<testnet deployer private key>
-ADMIN_ADDRESS=<administrator wallet address>
-CONTRACT_ADDRESS=<optional deployed contract address>
-```
-
-Backend `.env` for local API, Azure SQL, and Azure Blob Storage:
-
-```text
-PORT=4000
-CORS_ORIGIN=http://localhost:5173
-UPLOAD_DIR=
-AZURE_SQL_SERVER=<server>.database.windows.net
-AZURE_SQL_DATABASE=<database name>
-AZURE_SQL_USER=<sql username>
-AZURE_SQL_PASSWORD=<sql password>
-AZURE_SQL_PORT=1433
-AZURE_SQL_ENCRYPT=true
-AZURE_SQL_TRUST_SERVER_CERTIFICATE=false
-AZURE_SQL_RETRY_ATTEMPTS=5
-AZURE_SQL_RETRY_BASE_DELAY_MS=5000
-AZURE_STORAGE_CONNECTION_STRING=<storage account connection string>
-AZURE_STORAGE_CONTAINER=iot-logs
-```
-
-Frontend `.env` for local frontend overrides:
-
-```text
-VITE_RPC_URL=http://127.0.0.1:8545
-VITE_BACKEND_URL=http://localhost:4000
-VITE_CONTRACT_ADDRESS=
-VITE_BASE_PATH=/
-```
-
-For local development, `VITE_RPC_URL` and `VITE_CONTRACT_ADDRESS` must match the blockchain network selected in MetaMask. A localhost frontend can still use MetaMask; the browser URL does not decide the blockchain network.
-
-Real `.env` files, private keys, database passwords, and storage connection strings must stay outside GitHub.
-
-## Polygon Amoy Network for MetaMask
-
-Use this network when interacting with the deployed testnet contract:
-
-```text
-Network name: Polygon Amoy Testnet
-RPC URL: https://rpc-amoy.polygon.technology/
-Chain ID: 80002
-Currency symbol: POL
-Block explorer URL: https://amoy.polygonscan.com/
-```
-
-Steps to add Polygon Amoy in MetaMask:
-
-1. Open MetaMask.
-2. Click the network selector at the top.
-3. Choose `Add a custom network`.
-4. Enter the network details above.
-5. Save the network.
-6. Switch MetaMask to `Polygon Amoy Testnet` before using the deployed app.
-
-Polygon Amoy deployments and stakeholder write transactions require Amoy test `POL` for gas. Local Hardhat testing does not require testnet tokens because Hardhat creates pre-funded local test accounts automatically. Testnet tokens have no real-world value and are only used for gas on Polygon Amoy.
-
-## How to Use the App
-
-1. Open the web app.
-2. Connect MetaMask using `Connect Stakeholder Wallet`.
-3. Make sure MetaMask is on the same network as the configured contract: local Hardhat for local contracts, or Polygon Amoy for the deployed testnet contract.
-4. Use `Admin Access` from the admin wallet to grant or remove stakeholder roles.
-5. Switch MetaMask to the manufacturer wallet and use `Register Batch` to create a pharmaceutical batch.
-6. From the current custodian wallet, use `Transfer Custody` to move the batch to the next stakeholder wallet address.
-7. Switch MetaMask to the distributor wallet and use `Status Update` to mark shipment progress.
-8. Use `Condition Logs` as the distributor or retailer to generate/upload IoT logs and anchor their hash on-chain.
-9. Switch MetaMask to the retailer wallet and use `Status Update` to mark receipt or delivery.
-10. Switch MetaMask to the regulator wallet and use `Regulator Review` to add verification or recall a batch.
-11. Use `Batch Trace` to view the full provenance timeline.
-12. Use `Consumer Verify` or the QR route for a simplified read-only public verification view without requiring a wallet.
-13. Use `Tamper Check` to load the latest condition proof for a batch and compare the off-chain file with the on-chain hash.
-14. Use `Switch Wallet` or `Logout` when moving between stakeholder accounts.
-
-The navigation changes based on the connected wallet role. Unassigned wallets only see public/read-only pages. Stakeholder wallets see the pages matching their assigned roles. The contract does not infer distributor or retailer from transfer order alone; the recipient wallet's granted role determines what stakeholder it represents.
-
-## Tamper Evidence Flow
-
-The `Tamper Check` page demonstrates that raw IoT data can stay off-chain while still being verifiable.
-
-1. Enter a batch ID such as `BATCH001`.
-2. Click `Load Latest Condition Proof`.
-3. The app reads the latest `ConditionRecord` from the smart contract and fills in the anchored `logHash` and stored filename.
-4. Click `Run Hash Verification`.
-5. The backend fetches the raw IoT log from Azure Blob Storage or local storage, recomputes the `keccak256` hash, and compares it with the on-chain digest.
-6. A valid unmodified file shows `MATCH`.
-7. A changed or different file shows `MISMATCH`.
-
-This check is read-only and does not open MetaMask because it does not write a blockchain transaction. It is a backend verification against an existing on-chain proof.
-
-`Batch Trace` is the full auditor view. It shows batch metadata, wallet addresses, custody chain, condition proofs, verification records, recall records, and the QR route. `Consumer Verify` is intentionally simpler. It summarizes whether a buyer or receiving party should trust the batch, whether a warning or recall exists, and the high-level supply-chain path.
-
-## Live Site Interaction Testing
-
-The live deployment is available at:
-
-```text
-https://coldchain-provenance.vercel.app
-```
-
-The deployed Polygon Amoy contract is:
-
-```text
-0xAFdcF244CAb9d632946c42A07463F3105B605EF0
-```
-
-For live role-specific testing, test wallet private keys are provided separately through the private Canvas submission notes. Private keys are intentionally not committed to this public repository. The public addresses below are safe to include because they are used for role assignment on-chain.
-
-The following public addresses are currently recognized by the deployed Polygon Amoy contract. If a wallet does not show the expected role after import, connect an admin wallet and use `Admin Access` to grant the matching role again.
-
-| Stakeholder | Public Wallet Address | Role to Grant |
-| --- | --- | --- |
-| Admin | `0x106740923A201aCCcE412911880161760ce8B2BD` | Already contract admin |
-| Test Admin | `0x9287E3aAB5c5939845409fd7C16044FA7eBE3B1e` | Already contract admin |
-| Manufacturer | `0x1AD47A780fD10074804b9b60B370FEcf4c6758A0` | `Manufacturer` |
-| Distributor | `0xce03c80C3bAac6e8A3c45fD921F090F5AEAc4066` | `Distributor` |
-| Retailer | `0x2aa428655a6F04607795b1F639307ba2F4b981EA` | `Retailer` |
-| Regulator | `0x034e46defEb4ef20452B795E7Ae6263444dbAad2` | `Regulator` |
-| Consumer | Any wallet or no wallet | No role required |
-
-Live interaction workflow:
-
-1. Open MetaMask.
-2. Add the `Polygon Amoy Testnet` network using the details in the section above.
-3. Import the admin and stakeholder wallets using the private keys provided in the Canvas submission notes.
-4. Switch MetaMask to `Polygon Amoy Testnet`.
-5. Open [https://coldchain-provenance.vercel.app](https://coldchain-provenance.vercel.app).
-6. Connect the admin wallet.
-7. Open `Admin Access`.
-8. Confirm that `Manufacturer`, `Distributor`, `Retailer`, and `Regulator` roles are granted to the public addresses in the table above. If needed, grant the missing role from `Admin Access`.
-9. Switch MetaMask to the manufacturer wallet and reconnect in the app.
-10. Register a new batch ID, for example `BATCH` followed by the current time.
-11. Transfer custody from the manufacturer wallet to the distributor public address.
-12. Switch to the distributor wallet, update status to `Shipped`, generate or upload an IoT log in `Condition Logs`, and anchor the condition record.
-13. Transfer custody from the distributor wallet to the retailer public address.
-14. Switch to the retailer wallet and update status to `Received` or `Delivered`.
-15. Switch to the regulator wallet and add a verification or recall action.
-16. Use `Batch Trace`, `Consumer Verify`, and `Tamper Check` to inspect the final proof trail.
-
-For the cleanest role-specific demonstration, use separate wallets for each stakeholder. If one wallet has multiple roles, the app will show the combined menu for those roles because the deployed smart contract recognizes every role assigned to that address.
-
-## Backend API
-
-Base URL locally:
-
-```text
-http://localhost:4000
-```
-
-Base URL on Vercel:
-
-```text
-https://coldchain-provenance.vercel.app
-```
-
-Routes:
-
-- `GET /api/health`
-- `POST /api/logs/upload`
-- `POST /api/logs/simulate`
-- `GET /api/logs/:filename`
-- `POST /api/logs/verify`
-- `GET /api/batches/:batchId/offchain-summary`
-
-The API supports the required off-chain workflow: generate or upload IoT logs, calculate a `keccak256` digest, detect temperature breaches, store the raw log off-chain, return a URI/hash summary, and verify later whether a file still matches the expected digest.
-
-Safe temperature range:
-
-```text
-2C to 8C
-```
-
-Any reading outside this range sets `breachFlag = true`.
-
-## Testing
-
-Run smart contract tests:
-
-```bash
-npm test
-```
-
-Run backend tests:
-
-```bash
-npm --prefix backend test
-```
-
-Run frontend tests:
-
-```bash
-npm --prefix frontend test
-```
-
-Run all tests:
-
-```bash
-npm run test:all
-```
-
-Build frontend:
-
-```bash
-npm --prefix frontend run build
-```
-
-Generate gas report:
-
-```bash
-npm run gas
-```
-
-## Deploy Smart Contract to Polygon Amoy
-
-Create root `.env`:
-
-```text
-AMOY_RPC_URL=https://rpc-amoy.polygon.technology/
-PRIVATE_KEY=<testnet deployer private key>
-ADMIN_ADDRESS=<administrator wallet address>
-POLYGONSCAN_API_KEY=<polygonscan api key for contract verification>
-```
-
-The deployer wallet must have Amoy test `POL`.
-
-Deploy:
-
-```bash
-npm run deploy -- --network amoy
-```
-
-Optional low gas-price deployment:
-
-```bash
-DEPLOY_GAS_PRICE_GWEI=25 npm run deploy -- --network amoy
-```
-
-On Windows PowerShell:
-
-```powershell
-$env:DEPLOY_GAS_PRICE_GWEI="25"
-npm run deploy -- --network amoy
-Remove-Item Env:DEPLOY_GAS_PRICE_GWEI
-```
-
-The deployment prints the contract address and writes it to:
-
-```text
-frontend/public/demo-contract.json
-```
-
-## Verify Contract on PolygonScan
-
-PolygonScan can show readable function names and event logs only after the deployed contract source is verified. Without verification, transactions still exist on-chain, but the explorer may show raw method selectors such as `0xa97e4d3e` and raw event topics.
-
-Create a free PolygonScan account and API key, then add it to the root `.env`:
-
-```text
-POLYGONSCAN_API_KEY=<your polygonscan api key>
-```
-
-Verify the deployed Polygon Amoy contract:
-
-```bash
-npx hardhat verify --network polygonAmoy 0xAFdcF244CAb9d632946c42A07463F3105B605EF0 0x106740923A201aCCcE412911880161760ce8B2BD
-```
-
-The second address is the constructor argument for `SupplyChainProvenance`, which is the admin wallet used during deployment. If a different admin was used for a future deployment, replace that address with the admin constructor argument printed by `scripts/deploy.js`.
-
-The live project contract has already been verified. Open:
-
-```text
-https://amoy.polygonscan.com/address/0xAFdcF244CAb9d632946c42A07463F3105B605EF0#events
-```
-
-PolygonScan should then decode events such as `BatchRegistered`, `CustodyTransferred`, `ConditionRecorded`, `VerificationAdded`, and `BatchRecalled`.
-
-## Deploy Web App to Vercel
-
-The project is configured for Vercel using:
-
-- `vercel.json`
-- `api/index.js`
-- `frontend/dist` output
-- same-domain API routing under `/api`
-
-Required Vercel environment variables:
-
-```text
-VITE_RPC_URL=https://rpc-amoy.polygon.technology/
-VITE_CONTRACT_ADDRESS=<deployed Amoy contract address>
-AZURE_SQL_SERVER=<server>.database.windows.net
-AZURE_SQL_DATABASE=<database name>
-AZURE_SQL_USER=<sql username>
-AZURE_SQL_PASSWORD=<sql password>
-AZURE_SQL_ENCRYPT=true
-AZURE_STORAGE_CONNECTION_STRING=<storage account connection string>
-AZURE_STORAGE_CONTAINER=iot-logs
-```
-
-Leave `VITE_BACKEND_URL` blank on Vercel so the frontend uses same-domain `/api` routes.
-
-Deploy:
-
-```bash
-npx vercel --prod
-```
-
-Current production URL:
-
-```text
-https://coldchain-provenance.vercel.app
-```
-
-## Azure SQL and Azure Blob Storage
-
-The live deployment uses Azure Blob Storage and Azure SQL for off-chain data management.
-
-When `AZURE_SQL_*` variables are configured, the backend stores IoT log metadata, hashes, breach summaries, and storage references in Azure SQL. The backend creates or updates the `dbo.IotLogs` table automatically if it does not exist.
-
-Azure SQL Serverless may pause when idle. The backend retries transient wake-up failures, including error `40613`, before returning an API error.
-
-When `AZURE_STORAGE_CONNECTION_STRING` is configured, raw IoT JSON/CSV files are stored in a private Azure Blob container, normally `iot-logs`. Azure SQL stores only metadata, hashes, and blob references. If Azure Blob Storage is not configured but Azure SQL is configured, the backend can store raw file bytes in Azure SQL for demo fallback. If neither Azure service is configured, the backend falls back to local file storage under `backend/src/uploads`.
-
-Current live storage design:
-
-```text
-Raw IoT JSON/CSV file -> Azure Blob Storage
-Metadata/hash/summary -> Azure SQL
-Hash proof -> Polygon Amoy smart contract
-```
+The app supports role-based stakeholder access, batch registration, custody transfer, IoT condition anchoring, regulator verification, recall handling, consumer verification, QR trace lookup, and tamper-evidence hash checking.
 
 ## Why Blockchain Helps
 
-In a centralized tracker, one party can edit records without a shared immutable audit trail. This system uses smart contract transactions and events so each stakeholder action is attributable, ordered, and resistant to later alteration.
+Pharmaceutical cold-chain shipments involve multiple organizations that need to trust the same custody and condition history. A blockchain-based design provides a shared, append-only audit trail where custody transfers, condition proofs, verifications, and recalls can be independently checked by stakeholders and consumers.
 
-The consumer verification flow is useful during recalls. If a manufacturer-initiated or regulator-confirmed recall is recorded on-chain by an authorized regulator or admin, a consumer, pharmacy, or receiving team can enter the batch ID or scan the QR route to see whether that exact product batch should be used, accepted, rejected, or removed from circulation.
-
-The blockchain does not prove a physical sensor is honest. It proves that a specific log digest was submitted by a specific authorized stakeholder at a specific point in the lifecycle. That is the provenance and tamper-evidence benefit demonstrated by this project.
+The system still keeps raw IoT data off-chain for cost and scalability reasons. The blockchain is used for accountability, tamper-evidence, and role-based workflow enforcement rather than as a bulk data store.
