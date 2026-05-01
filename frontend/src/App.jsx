@@ -205,6 +205,10 @@ function parseError(error) {
     return "This status is not allowed from the batch's current lifecycle state. Reload the batch and choose one of the available next statuses.";
   }
 
+  if (/Only logistics custodian, regulator, or admin can record condition/i.test(joined)) {
+    return "Only the current distributor/retailer custodian, regulator, or admin can anchor this condition log. Transfer custody to the connected wallet first, then retry.";
+  }
+
   if (/unknown custom error/i.test(joined)) {
     return "Connected wallet does not have the required smart-contract role for this transaction.";
   }
@@ -1516,8 +1520,33 @@ function ConditionsPage({ app }) {
     }
 
     await app.runWalletWrite("Anchor IoT condition log", async (contract, overrides) => {
+      const cleanBatchId = batchId.trim();
+      if (!cleanBatchId) {
+        throw new Error("Enter a Batch ID before anchoring the condition log.");
+      }
+
+      const isAdminOrRegulator = hasAnyRole(app.walletRoles, ["Admin", "Regulator"]);
+      if (!isAdminOrRegulator) {
+        const isLogisticsRole = hasAnyRole(app.walletRoles, ["Distributor", "Retailer"]);
+        const batch = await contract.getBatch(cleanBatchId);
+        const currentCustodian = tupleValue(batch, "currentCustodian", 5);
+        const connectedWallet = app.walletAddress ? ethers.getAddress(app.walletAddress) : "";
+        const isCurrentCustodian =
+          connectedWallet &&
+          ethers.isAddress(currentCustodian) &&
+          ethers.getAddress(currentCustodian).toLowerCase() === connectedWallet.toLowerCase();
+
+        if (!isLogisticsRole || !isCurrentCustodian) {
+          throw new Error(
+            `Only the current distributor/retailer custodian can anchor condition logs. Current custodian is ${shortAddress(
+              currentCustodian
+            )}; connected wallet is ${shortAddress(app.walletAddress)}.`
+          );
+        }
+      }
+
       const tx = await contract.recordCondition(
-        batchId,
+        cleanBatchId,
         logResult.logHash,
         logResult.logURI,
         logResult.breachFlag,
@@ -1525,7 +1554,8 @@ function ConditionsPage({ app }) {
         overrides
       );
       await tx.wait();
-      await app.refreshBatch(batchId);
+      setBatchId(cleanBatchId);
+      await app.refreshBatch(cleanBatchId);
       await app.refreshDashboard();
     });
   }
@@ -1533,8 +1563,12 @@ function ConditionsPage({ app }) {
   return (
     <section className="page-grid">
       <div className="page-card">
-        <p className="eyebrow">Distributor / Retailer Condition Action</p>
+        <p className="eyebrow">Current Custodian Condition Action</p>
         <h2>Upload or Simulate IoT Log</h2>
+        <p className="muted">
+          Distributor and retailer wallets can anchor condition logs only while they are the batch's current custodian.
+          Regulator and admin wallets can also add review evidence.
+        </p>
         <Field label="Batch ID">
           <input value={batchId} onChange={(event) => setBatchId(event.target.value)} />
         </Field>
