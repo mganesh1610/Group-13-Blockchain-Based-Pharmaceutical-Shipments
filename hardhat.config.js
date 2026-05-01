@@ -1,9 +1,20 @@
-require("@nomicfoundation/hardhat-toolbox");
-require("hardhat-gas-reporter");
+require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-chai-matchers");
+require("@nomicfoundation/hardhat-verify");
 require("dotenv").config();
 
 const { AMOY_RPC_URL, PRIVATE_KEY, POLYGONSCAN_API_KEY } = process.env;
 const networks = {};
+let hasGasReporter = false;
+
+try {
+  require("hardhat-gas-reporter");
+  hasGasReporter = true;
+} catch (error) {
+  if (process.env.REPORT_GAS === "true") {
+    console.warn("hardhat-gas-reporter is unavailable in this environment; skipping gas report.");
+  }
+}
 
 if (AMOY_RPC_URL) {
   const amoyNetwork = {
@@ -30,9 +41,13 @@ module.exports = {
   etherscan: {
     apiKey: POLYGONSCAN_API_KEY || ""
   },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS === "true",
-    currency: "USD",
-    showTimeSpent: true
-  }
+  ...(hasGasReporter
+    ? {
+        gasReporter: {
+          enabled: process.env.REPORT_GAS === "true",
+          currency: "USD",
+          showTimeSpent: true
+        }
+      }
+    : {})
 };
