@@ -612,36 +612,46 @@ code {
 .contract-scan-link {
   grid-column: 1 / -1;
   display: grid;
-  gap: 0.16rem;
-  min-height: 58px;
-  padding: 0.72rem 0.82rem;
-  border: 1px solid rgba(0, 110, 120, 0.24);
+  gap: 0.14rem;
+  min-height: 60px;
+  padding: 0.72rem 0.84rem;
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-cold);
   border-radius: var(--radius-md);
   color: var(--color-primary);
-  background: linear-gradient(135deg, rgba(214, 242, 245, 0.9), rgba(255, 255, 255, 0.76));
+  text-decoration: none;
+  background:
+    linear-gradient(90deg, rgba(15, 111, 120, 0.055), transparent 52%),
+    rgba(255, 255, 255, 0.72);
   box-shadow: var(--shadow-sm);
 }
 
 .contract-scan-link:hover {
   transform: translateY(-1px);
-  border-color: rgba(0, 110, 120, 0.42);
+  border-color: var(--color-line-strong);
+  border-left-color: var(--color-cold-dark);
+  background:
+    linear-gradient(90deg, rgba(15, 111, 120, 0.08), transparent 56%),
+    var(--color-surface);
 }
 
 .contract-scan-link span,
 .contract-proof-card span {
-  color: var(--color-secondary);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  color: var(--color-cold);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .contract-scan-link strong {
-  color: var(--color-ink);
+  color: var(--color-primary);
   font-size: 0.9rem;
 }
 
 .contract-scan-link small {
+  color: var(--color-cold-dark);
   font-weight: 850;
 }
 
@@ -934,15 +944,19 @@ code {
   gap: 1rem;
   margin: 0.78rem 0;
   padding: 0.78rem;
-  border: 1px solid rgba(0, 110, 120, 0.24);
+  border: 1px solid var(--color-line);
+  border-left: 5px solid var(--color-cold);
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, rgba(214, 242, 245, 0.82), rgba(255, 255, 255, 0.72));
+  background:
+    linear-gradient(90deg, rgba(15, 111, 120, 0.055), transparent 54%),
+    rgba(255, 255, 255, 0.74);
   box-shadow: var(--shadow-sm);
 }
 
 .contract-proof-card strong {
   display: block;
   margin-top: 0.22rem;
+  color: var(--color-primary);
 }
 
 .contract-proof-card p {
@@ -952,12 +966,24 @@ code {
 
 .contract-proof-card a {
   flex: 0 0 auto;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-pill);
   padding: 0.58rem 0.9rem;
-  color: #fff;
-  background: linear-gradient(135deg, var(--color-action), var(--color-action-dark));
+  color: var(--color-cold-dark);
+  text-decoration: none;
+  border: 1px solid rgba(15, 111, 120, 0.22);
+  background: var(--color-cold-container);
   box-shadow: var(--shadow-sm);
   font-weight: 850;
+}
+
+.contract-proof-card a:hover {
+  color: var(--color-primary);
+  border-color: rgba(15, 111, 120, 0.36);
+  background: var(--color-surface);
 }
 
 .address-grid {
