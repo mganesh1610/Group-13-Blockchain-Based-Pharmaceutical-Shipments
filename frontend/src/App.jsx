@@ -24,6 +24,18 @@ const LOCAL_SANDBOX_CHAIN_ID = 31337n;
 const LOCAL_SANDBOX_MNEMONIC = "test test test test test test test test test test test junk";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const POLYGON_AMOY_CHAIN_ID = 80002n;
+const POLYGON_AMOY_CHAIN_HEX = "0x13882";
+const POLYGON_AMOY_NETWORK_PARAMS = {
+  chainId: POLYGON_AMOY_CHAIN_HEX,
+  chainName: "Polygon Amoy Testnet",
+  nativeCurrency: {
+    name: "POL",
+    symbol: "POL",
+    decimals: 18
+  },
+  rpcUrls: ["https://rpc-amoy.polygon.technology/"],
+  blockExplorerUrls: ["https://amoy.polygonscan.com/"]
+};
 const STATUS_OPTIONS = statusLabels
   .map((label, value) => ({ label, value }))
   .filter((status) => status.value > 0 && status.value < 6);
@@ -243,6 +255,30 @@ function isLocalSandboxConnection({ chainId, rpcUrl, contractAddress, networkSta
     rpcUrl.replace(/\/$/, "") === LOCAL_SANDBOX_RPC_URL ||
     contractAddress.toLowerCase() === LOCAL_SANDBOX_CONTRACT_ADDRESS.toLowerCase()
   );
+}
+
+function isPolygonAmoyConnection({ rpcUrl, contractAddress }) {
+  const normalizedRpc = String(rpcUrl || "").toLowerCase();
+  const normalizedContract = String(contractAddress || "").toLowerCase();
+  const configuredContract = String(DEFAULT_CONTRACT_ADDRESS || "").toLowerCase();
+
+  return (
+    normalizedRpc.includes("amoy") ||
+    normalizedRpc.includes("80002") ||
+    (configuredContract && normalizedContract === configuredContract)
+  );
+}
+
+async function switchToPolygonAmoy(browserProvider) {
+  try {
+    await browserProvider.send("wallet_switchEthereumChain", [{ chainId: POLYGON_AMOY_CHAIN_HEX }]);
+  } catch (error) {
+    if (error?.code !== 4902) {
+      throw error;
+    }
+
+    await browserProvider.send("wallet_addEthereumChain", [POLYGON_AMOY_NETWORK_PARAMS]);
+  }
 }
 
 function localSandboxTestKey(index) {
@@ -1967,7 +2003,7 @@ function ColdChainApp() {
         }
       }
 
-      const network = await browserProvider.getNetwork();
+      let network = await browserProvider.getNetwork();
       let activeContractAddress = contractAddress;
       const useLocalSandbox = isLocalSandboxConnection({
         chainId: network.chainId,
@@ -1975,6 +2011,7 @@ function ColdChainApp() {
         contractAddress,
         networkStatus
       });
+      const usePolygonAmoy = !useLocalSandbox && isPolygonAmoyConnection({ rpcUrl, contractAddress });
 
       if (useLocalSandbox) {
         const sandbox = await loadLocalSandboxConnection();
@@ -1985,7 +2022,20 @@ function ColdChainApp() {
         throw new Error("Set a valid contract address before connecting a stakeholder wallet.");
       }
 
-      const roleProvider = useLocalSandbox ? new ethers.JsonRpcProvider(LOCAL_SANDBOX_RPC_URL) : browserProvider;
+      if (usePolygonAmoy && network.chainId !== POLYGON_AMOY_CHAIN_ID) {
+        await switchToPolygonAmoy(browserProvider);
+        network = await browserProvider.getNetwork();
+
+        if (network.chainId !== POLYGON_AMOY_CHAIN_ID) {
+          throw new Error("Switch MetaMask to Polygon Amoy Testnet before connecting this live stakeholder wallet.");
+        }
+      }
+
+      const roleProvider = useLocalSandbox
+        ? new ethers.JsonRpcProvider(LOCAL_SANDBOX_RPC_URL)
+        : usePolygonAmoy
+          ? new ethers.JsonRpcProvider(rpcUrl)
+          : browserProvider;
       const deployedCode = await roleProvider.getCode(activeContractAddress);
       if (deployedCode === "0x") {
         throw new Error(
