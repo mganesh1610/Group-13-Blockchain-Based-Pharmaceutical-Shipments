@@ -36,6 +36,7 @@ const POLYGON_AMOY_NETWORK_PARAMS = {
   rpcUrls: ["https://rpc-amoy.polygon.technology/"],
   blockExplorerUrls: ["https://amoy.polygonscan.com/"]
 };
+const LOCAL_CONDITION_LOG_CACHE_KEY = "coldchain.localConditionLogs.v1";
 const STATUS_OPTIONS = statusLabels
   .map((label, value) => ({ label, value }))
   .filter((status) => status.value > 0 && status.value < 6);
@@ -248,6 +249,91 @@ function filenameFromLogUri(logURI = "") {
   return path.split("/").filter(Boolean).pop() || "";
 }
 
+function serializeConditionPayload(payload) {
+  return JSON.stringify(payload, null, 2);
+}
+
+function readLocalConditionLogCache() {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem(LOCAL_CONDITION_LOG_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalConditionLogCache(cache) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return;
+  }
+
+  try {
+    const entries = Object.entries(cache)
+      .sort(([, left], [, right]) => String(right.savedAt || "").localeCompare(String(left.savedAt || "")))
+      .slice(0, 40);
+    window.localStorage.setItem(LOCAL_CONDITION_LOG_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    // The cache only supports the browser demo path; blockchain anchoring can still proceed without it.
+  }
+}
+
+function cacheLocalConditionLog(logResult) {
+  if (!logResult?.filename || !logResult?.rawContent) {
+    return;
+  }
+
+  const cache = readLocalConditionLogCache();
+  cache[logResult.filename] = {
+    filename: logResult.filename,
+    rawContent: logResult.rawContent,
+    logHash: logResult.logHash,
+    summary: logResult.summary,
+    savedAt: new Date().toISOString()
+  };
+  writeLocalConditionLogCache(cache);
+}
+
+function getCachedLocalConditionLog(filename) {
+  const safeFilename = filenameFromLogUri(filename);
+  if (!safeFilename) {
+    return null;
+  }
+
+  return readLocalConditionLogCache()[safeFilename] || null;
+}
+
+function buildHashVerificationResult({ expectedHash, recomputedHash, sourceLabel }) {
+  const isMatch = recomputedHash.toLowerCase() === expectedHash.toLowerCase();
+  return {
+    recomputedHash,
+    expectedHash,
+    isMatch,
+    message: isMatch
+      ? `MATCH: ${sourceLabel} matches the anchored digest`
+      : `MISMATCH: ${sourceLabel} has changed or is not the anchored log`
+  };
+}
+
+async function verifyBrowserFileHash(file, expectedHash) {
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  return buildHashVerificationResult({
+    expectedHash,
+    recomputedHash: ethers.keccak256(buffer),
+    sourceLabel: "selected file"
+  });
+}
+
+function verifyCachedConditionLogHash(cachedLog, expectedHash) {
+  return buildHashVerificationResult({
+    expectedHash,
+    recomputedHash: ethers.keccak256(ethers.toUtf8Bytes(cachedLog.rawContent)),
+    sourceLabel: "browser-cached simulated log"
+  });
+}
+
 function validateWalletAddress(address) {
   if (!ethers.isAddress(address)) {
     throw new Error("Enter a valid MetaMask wallet address.");
@@ -341,7 +427,7 @@ function buildLocalSimulationResult(batchId, scenario, readingCount = 12) {
     safeRangeC: { min: 2, max: 8 },
     readings
   };
-  const serializedPayload = JSON.stringify(payload, null, 2);
+  const serializedPayload = serializeConditionPayload(payload);
   const uniqueSuffix = globalThis.crypto?.randomUUID?.().slice(0, 8) || String(Date.now()).slice(-8);
   const filename = `${sanitizeLogSegment(batchId, "batch")}-${sanitizeLogSegment(
     normalizedScenario,
@@ -357,6 +443,7 @@ function buildLocalSimulationResult(batchId, scenario, readingCount = 12) {
     readingCount: readings.length,
     minTemp,
     maxTemp,
+    rawContent: serializedPayload,
     payload
   };
 }
@@ -1575,6 +1662,7 @@ function ConditionsPage({ app }) {
 
     try {
       const result = buildLocalSimulationResult(cleanBatchId, scenario, 12);
+      cacheLocalConditionLog(result);
       setLogResult(result);
       setBatchId(cleanBatchId);
       setLogMessage(`Simulation ready: ${result.summary}`);
@@ -1959,21 +2047,49 @@ function TamperCheckPage({ app }) {
     try {
       let hashToCheck = expectedHash.trim();
       let filenameToCheck = filename.trim();
+      let proofForCheck = loadedProof;
 
       if (!hashToCheck || (!file && !filenameToCheck)) {
         const proof = await populateFromBatch();
         hashToCheck = proof.logHash;
         filenameToCheck = proof.storedFilename;
+        proofForCheck = proof;
       }
 
       if (file) {
-        const formData = new FormData();
-        formData.append("expectedHash", hashToCheck);
-        formData.append("file", file);
-        options.body = formData;
-      } else {
+        const response = await verifyBrowserFileHash(file, hashToCheck);
+        setResult(response);
+        app.setNotice({
+          type: response.isMatch ? "success" : "warning",
+          message:
+            response.message || (response.isMatch ? "MATCH: off-chain file is authentic." : "MISMATCH: file was changed.")
+        });
+        return;
+      }
+
+      const cachedLog = getCachedLocalConditionLog(filenameToCheck);
+      if (cachedLog) {
+        const response = verifyCachedConditionLogHash(cachedLog, hashToCheck);
+        setResult(response);
+        app.setNotice({
+          type: response.isMatch ? "success" : "warning",
+          message:
+            response.message || (response.isMatch ? "MATCH: off-chain file is authentic." : "MISMATCH: file was changed.")
+        });
+        return;
+      }
+
+      if (String(proofForCheck?.logURI || "").includes("/simulated-logs/")) {
+        throw new Error(
+          "This proof was generated as a browser simulation, but the raw log is not cached in this browser. Generate and anchor a new simulated log here, or choose the original JSON file."
+        );
+      }
+
+      if (filenameToCheck) {
         options.headers = { "Content-Type": "application/json" };
         options.body = JSON.stringify({ filename: filenameToCheck, expectedHash: hashToCheck });
+      } else {
+        throw new Error("Provide either a file or a stored filename.");
       }
 
       const response = await app.callBackend("/api/logs/verify", options);
@@ -2001,7 +2117,8 @@ function TamperCheckPage({ app }) {
         <p className="eyebrow">Tamper Evidence</p>
         <h2>Verify Off-chain Log Hash</h2>
         <p className="muted">
-          Enter a Batch ID to load the latest anchored condition proof, or paste the hash and filename manually.
+          Enter a Batch ID to load the latest anchored condition proof. Browser-generated demo logs verify instantly when
+          they were generated in this browser; otherwise choose the original JSON/CSV file.
         </p>
         <Field label="Batch ID">
           <input value={batchId} onChange={(event) => setBatchId(event.target.value)} placeholder="BATCH001" />
