@@ -293,6 +293,74 @@ function localSandboxTestKey(index) {
   return ethers.HDNodeWallet.fromPhrase(LOCAL_SANDBOX_MNEMONIC, undefined, `m/44'/60'/0'/0/${index}`).privateKey;
 }
 
+const conditionScenarioProfiles = {
+  normal: [3.4, 3.9, 4.2, 4.8, 5.1, 5.5, 5.9, 6.2, 6.5, 6.9, 7.2, 7.6],
+  mild_breach: [3.6, 4.1, 4.7, 5.3, 6.4, 7.1, 8.4, 8.9, 7.6, 6.2, 5.4, 4.8],
+  severe_breach: [3.5, 4.0, 4.8, 6.2, 8.6, 10.1, 11.7, 12.3, 9.4, 7.1, 5.8, 4.6]
+};
+
+function sanitizeLogSegment(value, fallback = "log") {
+  const safe = String(value || fallback)
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return safe || fallback;
+}
+
+function buildSimulatedReadings(batchId, scenario, count = 12) {
+  const temps = conditionScenarioProfiles[scenario] || conditionScenarioProfiles.normal;
+  const start = Date.now() - count * 15 * 60 * 1000;
+
+  return Array.from({ length: count }, (_, index) => ({
+    time: new Date(start + index * 15 * 60 * 1000).toISOString(),
+    tempC: temps[index % temps.length],
+    humidity: 58 + (index % 6),
+    gps: index < count / 2 ? "Phoenix, AZ" : "Tempe, AZ",
+    batchId
+  }));
+}
+
+function buildLocalSimulationResult(batchId, scenario, readingCount = 12) {
+  const normalizedScenario = conditionScenarioProfiles[scenario] ? scenario : "normal";
+  const normalizedCount = Math.max(1, Math.min(Number(readingCount) || 12, 96));
+  const generatedAt = new Date().toISOString();
+  const readings = buildSimulatedReadings(batchId, normalizedScenario, normalizedCount);
+  const temperatures = readings.map((reading) => Number(reading.tempC)).filter(Number.isFinite);
+  const minTemp = Math.min(...temperatures);
+  const maxTemp = Math.max(...temperatures);
+  const breachFlag = temperatures.some((tempC) => tempC < 2 || tempC > 8);
+  const summary = `${readings.length} readings, min ${minTemp.toFixed(1)}C, max ${maxTemp.toFixed(1)}C, ${
+    breachFlag ? "breach detected" : "compliant"
+  }`;
+  const payload = {
+    batchId,
+    sensorId: `TEMP-${normalizedScenario.toUpperCase().replace(/[^A-Z0-9]/g, "-")}`,
+    scenario: normalizedScenario,
+    generatedAt,
+    safeRangeC: { min: 2, max: 8 },
+    readings
+  };
+  const serializedPayload = JSON.stringify(payload, null, 2);
+  const uniqueSuffix = globalThis.crypto?.randomUUID?.().slice(0, 8) || String(Date.now()).slice(-8);
+  const filename = `${sanitizeLogSegment(batchId, "batch")}-${sanitizeLogSegment(
+    normalizedScenario,
+    "simulation"
+  )}-${Date.now()}-${uniqueSuffix}.json`;
+
+  return {
+    filename,
+    logURI: `/simulated-logs/${filename}`,
+    logHash: ethers.keccak256(ethers.toUtf8Bytes(serializedPayload)),
+    breachFlag,
+    summary,
+    readingCount: readings.length,
+    minTemp,
+    maxTemp,
+    payload
+  };
+}
+
 async function getStakeholderRoleHash(contract, roleKey) {
   const role = stakeholderRoleOptions.find((option) => option.key === roleKey);
   if (!role) {
@@ -1474,11 +1542,7 @@ function ConditionsPage({ app }) {
     setLogMessage("Generating simulated IoT log...");
 
     try {
-      const result = await app.callBackend("/api/logs/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batchId: cleanBatchId, scenario, readingCount: 12 })
-      });
+      const result = buildLocalSimulationResult(cleanBatchId, scenario, 12);
       setLogResult(result);
       setBatchId(cleanBatchId);
       setLogMessage(`Simulation ready: ${result.summary}`);
@@ -1561,7 +1625,9 @@ function ConditionsPage({ app }) {
           throw new Error(
             `Only the current distributor/retailer custodian can anchor condition logs. Current custodian is ${shortAddress(
               currentCustodian
-            )}; connected wallet is ${shortAddress(app.walletAddress)}.`
+            )}; connected wallet is ${shortAddress(
+              app.walletAddress
+            )}. Use the current custodian wallet or transfer custody back first.`
           );
         }
       }
@@ -1589,6 +1655,10 @@ function ConditionsPage({ app }) {
         <p className="muted">
           Distributor and retailer wallets can anchor condition logs only while they are the batch's current custodian.
           Regulator and admin wallets can also add review evidence.
+        </p>
+        <p className="muted">
+          Simulated logs are generated in the browser for a fast demo. Use JSON/CSV upload when you need a backend-stored
+          off-chain file.
         </p>
         <Field label="Batch ID">
           <input value={batchId} onChange={(event) => setBatchId(event.target.value)} />
